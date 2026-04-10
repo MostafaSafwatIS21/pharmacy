@@ -17,4 +17,5 @@ contextBridge.exposeInMainWorld("pharmacyDb", {
 
   saveInvoice: (payload) => ipcRenderer.invoke("invoice:save", payload),
   listInvoices: (payload) => ipcRenderer.invoke("invoice:list", payload),
+  deleteInvoice: (payload) => ipcRenderer.invoke("invoice:delete", payload),
 });

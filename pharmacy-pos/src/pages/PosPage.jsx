@@ -6,13 +6,17 @@ import { addCustomer, listCustomers } from "../services/customerDataSource";
 import { saveInvoiceLines } from "../services/invoiceDataSource";
 import { useCatalogStore } from "../store/useCatalogStore";
 
-const formatCurrency = (value) => `$${value.toFixed(2)}`;
+const formatCurrency = (value) =>
+  new Intl.NumberFormat("ar-EG", {
+    style: "currency",
+    currency: "EGP",
+  }).format(Number(value || 0));
 
 function PosPage() {
   const items = useCatalogStore((state) => state.items);
   const selectedItemIds = useCatalogStore((state) => state.selectedItemIds);
-  const [customerName, setCustomerName] = useState("Walk-in Customer");
-  const [cashierName, setCashierName] = useState("Main Cashier");
+  const [customerName, setCustomerName] = useState("عميل نقدي");
+  const [cashierName, setCashierName] = useState("الكاشير الرئيسي");
   const [customers, setCustomers] = useState([]);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [customerForm, setCustomerForm] = useState({
@@ -22,13 +26,16 @@ function PosPage() {
   });
   const [customerMessage, setCustomerMessage] = useState("");
   const [invoiceMessage, setInvoiceMessage] = useState("");
+  const [isSavingInvoice, setIsSavingInvoice] = useState(false);
   const [taxRate, setTaxRate] = useState(14);
   const [showQuantity, setShowQuantity] = useState(true);
   const [showLineTotal, setShowLineTotal] = useState(true);
   const [showTaxAmount, setShowTaxAmount] = useState(true);
   const [showPriceAfterTax, setShowPriceAfterTax] = useState(true);
+  const [invoicePriceById, setInvoicePriceById] = useState({});
   const [quantityById, setQuantityById] = useState({});
   const [selectedRowId, setSelectedRowId] = useState("");
+  const [lastSavedCartFingerprint, setLastSavedCartFingerprint] = useState("");
   const invoiceRef = useRef(null);
 
   const selectedIdSet = useMemo(
@@ -44,23 +51,39 @@ function PosPage() {
   const lineItems = useMemo(
     () =>
       selectedItems.map((item) => {
+        const unitPrice = Math.max(
+          0,
+          Number(invoicePriceById[item.id] ?? item.price) || 0,
+        );
         const quantity = Math.max(1, Number(quantityById[item.id] || 1));
-        const lineTotal = item.price * quantity;
+        const lineTotal = unitPrice * quantity;
         const taxAmount = lineTotal * (safeTaxRate / 100);
         return {
           ...item,
+          price: unitPrice,
           quantity,
           lineTotal,
           taxAmount,
           totalAfterTax: lineTotal + taxAmount,
         };
       }),
-    [quantityById, selectedItems, safeTaxRate],
+    [invoicePriceById, quantityById, selectedItems, safeTaxRate],
   );
 
   const subtotal = lineItems.reduce((sum, item) => sum + item.lineTotal, 0);
   const tax = subtotal * (safeTaxRate / 100);
   const grandTotal = subtotal + tax;
+  const cartFingerprint = useMemo(
+    () =>
+      JSON.stringify(
+        lineItems.map((item) => ({
+          id: item.id,
+          qty: item.quantity,
+        })),
+      ),
+    [lineItems],
+  );
+  const canSaveInvoice = cartFingerprint !== lastSavedCartFingerprint;
 
   const handlePrint = useReactToPrint({
     contentRef: invoiceRef,
@@ -72,12 +95,12 @@ function PosPage() {
   };
 
   const selectedRowName =
-    lineItems.find((item) => item.id === selectedRowId)?.name || "None";
+    lineItems.find((item) => item.id === selectedRowId)?.name || "لا يوجد";
 
   useEffect(() => {
     listCustomers()
       .then((result) => setCustomers(result))
-      .catch(() => setCustomerMessage("Failed to load customers."));
+      .catch(() => setCustomerMessage("تعذر تحميل العملاء."));
   }, []);
 
   const submitNewCustomer = async (event) => {
@@ -91,25 +114,46 @@ function PosPage() {
       setCustomerName(created.name);
       setCustomerForm({ name: "", location: "", phoneNumber: "" });
       setShowAddCustomer(false);
-      setCustomerMessage("Customer added and selected.");
+      setCustomerMessage("تمت إضافة العميل واختياره.");
     } catch (error) {
-      setCustomerMessage(error.message || "Failed to add customer.");
+      setCustomerMessage(error.message || "فشل إضافة العميل.");
     }
   };
 
   const handleSaveInvoice = async () => {
+    if (isSavingInvoice) {
+      return;
+    }
+
+    if (!canSaveInvoice) {
+      setInvoiceMessage(
+        "لا يمكن حفظ نفس الفاتورة مرة أخرى. أضف صنفًا جديدًا أولًا.",
+      );
+      return;
+    }
+
     setInvoiceMessage("");
+    setIsSavingInvoice(true);
 
     try {
       const result = await saveInvoiceLines({
         customerName,
         lineItems,
       });
-      setInvoiceMessage(
-        `Invoice ${result.invoiceNumber} saved with ${result.rowsSaved} item(s).`,
-      );
+      if (result.duplicatePrevented) {
+        setInvoiceMessage(
+          "لا يمكن حفظ نفس الفاتورة مرة أخرى. أضف صنفًا جديدًا أولًا.",
+        );
+      } else {
+        setLastSavedCartFingerprint(cartFingerprint);
+        setInvoiceMessage(
+          `تم حفظ الفاتورة ${result.invoiceNumber} بعدد ${result.rowsSaved} صنف.`,
+        );
+      }
     } catch (error) {
-      setInvoiceMessage(error.message || "Failed to save invoice.");
+      setInvoiceMessage(error.message || "فشل حفظ الفاتورة.");
+    } finally {
+      setIsSavingInvoice(false);
     }
   };
 
@@ -118,17 +162,15 @@ function PosPage() {
   if (selectedItems.length === 0) {
     return (
       <section className="space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-6">
-        <h2 className="font-display text-2xl text-slate-900">
-          POS & Sales Invoice
-        </h2>
+        <h2 className="font-display text-2xl text-slate-900">فاتورة البيع</h2>
         <p className="text-slate-700">
-          No selected items yet. Please choose items from Items Directory first.
+          لا توجد أصناف محددة. اختر الأصناف أولًا من صفحة المنتجات.
         </p>
         <Link
           to="/items"
           className="inline-flex rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
         >
-          Back to Items Directory
+          الرجوع إلى المنتجات
         </Link>
       </section>
     );
@@ -140,19 +182,20 @@ function PosPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-2xl text-slate-900">
-              POS & Sales Invoice
+              فاتورة البيع
             </h2>
             <p className="mt-1 text-slate-600">
-              Invoice uses name and price with tax-based price calculations.
+              الفاتورة تعتمد على الاسم والسعر مع حساب الضريبة.
             </p>
           </div>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={handleSaveInvoice}
+              disabled={isSavingInvoice || !canSaveInvoice}
               className="inline-flex items-center gap-2 rounded-full border border-slate-900 px-4 py-2 text-sm font-semibold text-slate-900"
             >
-              Save Invoice
+              {isSavingInvoice ? "جارٍ الحفظ..." : "حفظ الفاتورة"}
             </button>
             <button
               type="button"
@@ -160,26 +203,26 @@ function PosPage() {
               className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
             >
               <Printer size={16} />
-              Print Invoice
+              طباعة الفاتورة
             </button>
             <Link
               to="/items"
               className="inline-flex rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
             >
-              Back to Items Directory
+              الرجوع إلى المنتجات
             </Link>
           </div>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <label className="space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Customer Name</span>
+            <span className="font-medium text-slate-700">اسم العميل</span>
             <select
               value={customerName}
               onChange={(event) => setCustomerName(event.target.value)}
               className="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-slate-700"
             >
-              <option value="Walk-in Customer">Walk-in Customer</option>
+              <option value="عميل نقدي">عميل نقدي</option>
               {customers.map((customer) => (
                 <option key={customer.id} value={customer.name}>
                   {customer.name}
@@ -188,7 +231,7 @@ function PosPage() {
             </select>
           </label>
           <label className="space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Cashier Name</span>
+            <span className="font-medium text-slate-700">اسم الكاشير</span>
             <input
               value={cashierName}
               onChange={(event) => setCashierName(event.target.value)}
@@ -196,7 +239,7 @@ function PosPage() {
             />
           </label>
           <label className="space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Tax Rate (%)</span>
+            <span className="font-medium text-slate-700">نسبة الضريبة (%)</span>
             <input
               type="number"
               min="0"
@@ -215,7 +258,7 @@ function PosPage() {
             onClick={() => setShowAddCustomer((current) => !current)}
             className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
           >
-            {showAddCustomer ? "Hide Add Customer" : "Add New Customer"}
+            {showAddCustomer ? "إخفاء إضافة عميل" : "إضافة عميل جديد"}
           </button>
         </div>
 
@@ -232,7 +275,7 @@ function PosPage() {
                   name: event.target.value,
                 }))
               }
-              placeholder="Name"
+              placeholder="الاسم"
               required
               className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-700"
             />
@@ -244,7 +287,7 @@ function PosPage() {
                   location: event.target.value,
                 }))
               }
-              placeholder="Location"
+              placeholder="العنوان"
               required
               className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-700"
             />
@@ -256,7 +299,7 @@ function PosPage() {
                   phoneNumber: event.target.value,
                 }))
               }
-              placeholder="Phone Number"
+              placeholder="رقم الهاتف"
               required
               className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-700"
             />
@@ -264,7 +307,7 @@ function PosPage() {
               type="submit"
               className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
             >
-              Save Customer
+              حفظ العميل
             </button>
           </form>
         )}
@@ -288,7 +331,7 @@ function PosPage() {
               onChange={(event) => setShowQuantity(event.target.checked)}
               className="h-4 w-4"
             />
-            Quantity
+            الكمية
           </label>
           <label className="flex items-center gap-2 text-slate-700">
             <input
@@ -297,7 +340,7 @@ function PosPage() {
               onChange={(event) => setShowLineTotal(event.target.checked)}
               className="h-4 w-4"
             />
-            Line total
+            إجمالي السطر
           </label>
           <label className="flex items-center gap-2 text-slate-700">
             <input
@@ -306,7 +349,7 @@ function PosPage() {
               onChange={(event) => setShowTaxAmount(event.target.checked)}
               className="h-4 w-4"
             />
-            Tax amount
+            قيمة الضريبة
           </label>
           <label className="flex items-center gap-2 text-slate-700">
             <input
@@ -315,9 +358,13 @@ function PosPage() {
               onChange={(event) => setShowPriceAfterTax(event.target.checked)}
               className="h-4 w-4"
             />
-            Price after tax
+            السعر بعد الضريبة
           </label>
         </div>
+        <p className="mt-2 text-xs text-slate-600">
+          تعديل سعر الوحدة هنا يطبق على هذه الفاتورة فقط ولا يغير سعر المنتج في
+          قاعدة البيانات.
+        </p>
       </div>
 
       <div className="screen-only overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -325,13 +372,13 @@ function PosPage() {
           <table className="w-full min-w-245 border-collapse text-left text-sm">
             <thead className="sticky top-0 bg-slate-100">
               <tr>
-                <th className="px-4 py-3">Item</th>
-                <th className="px-4 py-3">Unit Price</th>
-                {showQuantity && <th className="px-4 py-3">Qty</th>}
-                {showLineTotal && <th className="px-4 py-3">Line Total</th>}
-                {showTaxAmount && <th className="px-4 py-3">Tax Amount</th>}
+                <th className="px-4 py-3">الصنف</th>
+                <th className="px-4 py-3">سعر الوحدة</th>
+                {showQuantity && <th className="px-4 py-3">الكمية</th>}
+                {showLineTotal && <th className="px-4 py-3">الإجمالي</th>}
+                {showTaxAmount && <th className="px-4 py-3">الضريبة</th>}
                 {showPriceAfterTax && (
-                  <th className="px-4 py-3">Total After Tax</th>
+                  <th className="px-4 py-3">الإجمالي بعد الضريبة</th>
                 )}
               </tr>
             </thead>
@@ -350,7 +397,23 @@ function PosPage() {
                     {item.name}
                   </td>
                   <td className="px-4 py-3 text-slate-700">
-                    {formatCurrency(item.price)}
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.price}
+                      onClick={(event) => event.stopPropagation()}
+                      onChange={(event) =>
+                        setInvoicePriceById((current) => ({
+                          ...current,
+                          [item.id]: Math.max(
+                            0,
+                            Number(event.target.value || 0),
+                          ),
+                        }))
+                      }
+                      className="w-28 rounded-lg border border-slate-300 px-2 py-1 text-right outline-none focus:border-slate-700"
+                    />
                   </td>
                   {showQuantity && (
                     <td className="px-4 py-3">
@@ -397,20 +460,20 @@ function PosPage() {
       <div className="screen-only rounded-2xl border border-slate-200 bg-white p-5">
         <div className="ml-auto max-w-sm space-y-2 text-sm">
           <div className="flex items-center justify-between text-slate-700">
-            <span>Subtotal</span>
+            <span>الإجمالي قبل الضريبة</span>
             <span>{formatCurrency(subtotal)}</span>
           </div>
           <div className="flex items-center justify-between text-slate-700">
-            <span>Tax ({safeTaxRate}%)</span>
+            <span>الضريبة ({safeTaxRate}%)</span>
             <span>{formatCurrency(tax)}</span>
           </div>
           <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-base font-semibold text-slate-900">
-            <span>Grand Total</span>
+            <span>الإجمالي النهائي</span>
             <span>{formatCurrency(grandTotal)}</span>
           </div>
         </div>
         <p className="mt-4 text-sm font-medium text-slate-700">
-          Selected row: {selectedRowName}
+          الصف المحدد: {selectedRowName}
         </p>
       </div>
 
@@ -421,56 +484,46 @@ function PosPage() {
         <div className="mb-5 flex items-start justify-between border-b border-slate-200 pb-4">
           <div>
             <h3 className="font-display text-2xl text-slate-900">
-              Pharmacy POS Invoice
+              فاتورة بيع صيدلية
             </h3>
-            <p className="text-sm text-slate-600">Print Layout B</p>
+            <p className="text-sm text-slate-600">تنسيق الطباعة</p>
           </div>
           <ReceiptText size={32} className="text-slate-400" />
         </div>
 
         <div className="mb-4 grid gap-1 text-sm text-slate-700 sm:grid-cols-2">
           <p>
-            <span className="font-semibold text-slate-900">Date:</span>{" "}
-            {today.toLocaleDateString()}
+            <span className="font-semibold text-slate-900">التاريخ:</span>{" "}
+            {today.toLocaleDateString("ar-EG")}
           </p>
           <p>
-            <span className="font-semibold text-slate-900">Time:</span>{" "}
-            {today.toLocaleTimeString()}
+            <span className="font-semibold text-slate-900">الوقت:</span>{" "}
+            {today.toLocaleTimeString("ar-EG")}
           </p>
           <p>
-            <span className="font-semibold text-slate-900">Customer:</span>{" "}
-            {customerName || "Walk-in Customer"}
+            <span className="font-semibold text-slate-900">العميل:</span>{" "}
+            {customerName || "عميل نقدي"}
           </p>
           <p>
-            <span className="font-semibold text-slate-900">Cashier:</span>{" "}
-            {cashierName || "Main Cashier"}
+            <span className="font-semibold text-slate-900">الكاشير:</span>{" "}
+            {cashierName || "الكاشير الرئيسي"}
           </p>
         </div>
 
         <table className="mb-4 w-full border-collapse text-left text-sm">
           <thead>
             <tr className="border-y border-slate-300 text-slate-700">
-              <th className="px-2 py-2">Item</th>
-              <th className="px-2 py-2">Unit</th>
-              {showQuantity && <th className="px-2 py-2">Qty</th>}
-              {showLineTotal && <th className="px-2 py-2">Total</th>}
-              {showTaxAmount && <th className="px-2 py-2">Tax</th>}
-              {showPriceAfterTax && (
-                <th className="px-2 py-2">Total After Tax</th>
-              )}
+              <th className="px-2 py-2">الصنف</th>
+              <th className="px-2 py-2">سعر الوحدة</th>
+              {showQuantity && <th className="px-2 py-2">الكمية</th>}
+              {showLineTotal && <th className="px-2 py-2">الإجمالي</th>}
+              {showTaxAmount && <th className="px-2 py-2">الضريبة</th>}
+              {showPriceAfterTax && <th className="px-2 py-2">بعد الضريبة</th>}
             </tr>
           </thead>
           <tbody>
             {lineItems.map((item) => (
-              <tr
-                key={item.id}
-                onClick={() => handleRowSelect(item.id)}
-                className={`cursor-pointer border-b border-slate-200 ${
-                  selectedRowId === item.id
-                    ? "bg-emerald-100 ring-1 ring-emerald-500"
-                    : ""
-                }`}
-              >
+              <tr key={item.id} className="border-b border-slate-200">
                 <td className="px-2 py-2 font-semibold text-slate-900">
                   {item.name}
                 </td>
@@ -502,15 +555,15 @@ function PosPage() {
 
         <div className="ml-auto max-w-xs space-y-1 text-sm">
           <p className="flex justify-between text-slate-700">
-            <span>Subtotal</span>
+            <span>الإجمالي قبل الضريبة</span>
             <span>{formatCurrency(subtotal)}</span>
           </p>
           <p className="flex justify-between text-slate-700">
-            <span>Tax ({safeTaxRate}%)</span>
+            <span>الضريبة ({safeTaxRate}%)</span>
             <span>{formatCurrency(tax)}</span>
           </p>
           <p className="flex justify-between border-t border-slate-300 pt-2 text-base font-bold text-slate-900">
-            <span>Grand Total</span>
+            <span>الإجمالي النهائي</span>
             <span>{formatCurrency(grandTotal)}</span>
           </p>
         </div>

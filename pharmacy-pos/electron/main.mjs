@@ -74,6 +74,9 @@ const registerIpcHandlers = async () => {
   ipcMain.handle("invoice:list", async (_event, payload) =>
     invoiceDb.listInvoices(payload || {}),
   );
+  ipcMain.handle("invoice:delete", async (_event, payload) =>
+    invoiceDb.deleteInvoice(payload || {}),
+  );
 };
 
 const createWindow = async () => {

@@ -71,13 +71,23 @@ export const updateCustomer = async ({ id, name, location, phoneNumber }) => {
   });
 };
 
-export const deleteCustomer = async ({ id }) => {
+export const deleteCustomer = async ({ id, name }) => {
   const customerId = Number(id);
-  if (!Number.isFinite(customerId)) {
-    throw new Error("Customer id is required.");
+  const normalizedName = String(name || "").trim();
+
+  if (Number.isFinite(customerId)) {
+    return prisma.customer.delete({
+      where: { id: customerId },
+    });
   }
 
-  return prisma.customer.delete({
-    where: { id: customerId },
+  if (!normalizedName) {
+    throw new Error("Customer id or name is required.");
+  }
+
+  return prisma.customer.deleteMany({
+    where: {
+      name: normalizedName,
+    },
   });
 };

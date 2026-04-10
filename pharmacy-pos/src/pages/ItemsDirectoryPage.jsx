@@ -143,10 +143,10 @@ function ItemsDirectoryPage() {
           updateItemField,
         });
       }
-      setMessage("Product updated.");
+      setMessage("تم تحديث المنتج.");
       cancelRowEdit();
     } catch (error) {
-      setMessage(error.message || "Failed to update product.");
+      setMessage(error.message || "فشل تحديث المنتج.");
     }
   };
 
@@ -162,15 +162,15 @@ function ItemsDirectoryPage() {
       });
       setNewName("");
       setNewPrice("");
-      setMessage("Product added.");
+      setMessage("تمت إضافة المنتج.");
     } catch (error) {
-      setMessage(error.message || "Failed to add product.");
+      setMessage(error.message || "فشل إضافة المنتج.");
     }
   };
 
   const handleDeleteSelected = async () => {
     if (selectedItemIds.length === 0) {
-      setMessage("Select products to delete.");
+      setMessage("اختر منتجات للحذف.");
       return;
     }
 
@@ -183,24 +183,22 @@ function ItemsDirectoryPage() {
         removeLocalItems: removeItems,
       });
       clearSelection();
-      setMessage("Selected products deleted.");
+      setMessage("تم حذف المنتجات المحددة.");
     } catch (error) {
-      setMessage(error.message || "Failed to delete products.");
+      setMessage(error.message || "فشل حذف المنتجات.");
     }
   };
 
   if (items.length === 0) {
     return (
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
-        <h2 className="font-display text-2xl text-slate-900">
-          Items Directory
-        </h2>
-        <p className="mt-2 text-slate-700">No imported items found yet.</p>
+        <h2 className="font-display text-2xl text-slate-900">المنتجات</h2>
+        <p className="mt-2 text-slate-700">لا توجد منتجات مستوردة حتى الآن.</p>
         <Link
           to="/import"
           className="mt-5 inline-flex rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white"
         >
-          Go to Data Import
+          الذهاب إلى الاستيراد
         </Link>
       </section>
     );
@@ -210,11 +208,9 @@ function ItemsDirectoryPage() {
     <section className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-display text-2xl text-slate-900">
-            Items Directory
-          </h2>
+          <h2 className="font-display text-2xl text-slate-900">المنتجات</h2>
           <p className="mt-1 text-slate-600">
-            Search, filter, and select items for quotation or POS invoice.
+            ابحث وحدد المنتجات لاستخدامها في عرض السعر أو فاتورة البيع.
           </p>
         </div>
 
@@ -223,13 +219,13 @@ function ItemsDirectoryPage() {
             to="/quotation"
             className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
           >
-            Build Quotation
+            إنشاء عرض سعر
           </Link>
           <Link
             to="/pos"
             className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
           >
-            Start POS Sale
+            بدء فاتورة بيع
           </Link>
         </div>
       </div>
@@ -240,7 +236,7 @@ function ItemsDirectoryPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by name, details, type, or price"
+            placeholder="بحث بالاسم أو السعر"
             className="w-full border-none bg-transparent text-sm text-slate-800 outline-none"
           />
         </label>
@@ -252,7 +248,7 @@ function ItemsDirectoryPage() {
         >
           {typeOptions.map((type) => (
             <option key={type} value={type}>
-              {type === "all" ? "All types" : type}
+              {type === "all" ? "كل الأنواع" : type}
             </option>
           ))}
         </select>
@@ -262,7 +258,7 @@ function ItemsDirectoryPage() {
           onClick={toggleSelectAllVisible}
           className="rounded-xl border border-slate-900 px-3 py-2 text-sm font-semibold text-slate-900"
         >
-          {allVisibleSelected ? "Unselect Page" : "Select Page"}
+          {allVisibleSelected ? "إلغاء تحديد الصفحة" : "تحديد الصفحة"}
         </button>
 
         <button
@@ -271,7 +267,7 @@ function ItemsDirectoryPage() {
           className="inline-flex items-center justify-center gap-1 rounded-xl border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700"
         >
           <Trash2 size={14} />
-          Delete Selected
+          حذف المحدد
         </button>
 
         <select
@@ -279,9 +275,9 @@ function ItemsDirectoryPage() {
           onChange={(event) => setPageSize(Number(event.target.value))}
           className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none"
         >
-          <option value={100}>100 / page</option>
-          <option value={250}>250 / page</option>
-          <option value={500}>500 / page</option>
+          <option value={100}>100 / صفحة</option>
+          <option value={250}>250 / صفحة</option>
+          <option value={500}>500 / صفحة</option>
         </select>
       </div>
 
@@ -289,13 +285,13 @@ function ItemsDirectoryPage() {
         <input
           value={newName}
           onChange={(event) => setNewName(event.target.value)}
-          placeholder="New product name"
+          placeholder="اسم المنتج الجديد"
           className="rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-700"
         />
         <input
           value={newPrice}
           onChange={(event) => setNewPrice(event.target.value)}
-          placeholder="Price"
+          placeholder="السعر"
           className="rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-700"
         />
         <button
@@ -303,7 +299,7 @@ function ItemsDirectoryPage() {
           onClick={handleAddProduct}
           className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
         >
-          Add Product
+          إضافة منتج
         </button>
       </div>
 
@@ -312,13 +308,13 @@ function ItemsDirectoryPage() {
           <table className="w-full min-w-245 border-collapse text-left text-sm">
             <thead className="sticky top-0 bg-slate-100">
               <tr className="text-slate-700">
-                <th className="px-4 py-3">Select</th>
+                <th className="px-4 py-3">تحديد</th>
                 {visibleHeaders.map((header) => (
                   <th key={header} className="px-4 py-3">
                     {header}
                   </th>
                 ))}
-                <th className="px-4 py-3">Actions</th>
+                <th className="px-4 py-3">الإجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -386,7 +382,7 @@ function ItemsDirectoryPage() {
                             }}
                             className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
                           >
-                            Update
+                            تحديث
                           </button>
                           <button
                             type="button"
@@ -396,7 +392,7 @@ function ItemsDirectoryPage() {
                             }}
                             className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
                           >
-                            Cancel
+                            إلغاء
                           </button>
                         </div>
                       ) : (
@@ -408,7 +404,7 @@ function ItemsDirectoryPage() {
                           }}
                           className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
                         >
-                          Edit
+                          تعديل
                         </button>
                       )}
                     </td>
@@ -421,8 +417,8 @@ function ItemsDirectoryPage() {
       </div>
 
       <p className="text-sm text-slate-700">
-        Showing page {safePage} / {totalPages} ({visibleItems.length} rows) out
-        of {filteredItems.length} filtered, {items.length} total. Selected:{" "}
+        صفحة {safePage} / {totalPages} ({visibleItems.length} صف) من أصل{" "}
+        {filteredItems.length} بعد التصفية، الإجمالي {items.length}. المحدد:{" "}
         {selectedItemIds.length}
       </p>
 
@@ -433,7 +429,7 @@ function ItemsDirectoryPage() {
           disabled={safePage === 1}
           className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Previous
+          السابق
         </button>
         <button
           type="button"
@@ -443,7 +439,7 @@ function ItemsDirectoryPage() {
           disabled={safePage === totalPages}
           className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Next
+          التالي
         </button>
       </div>
       {message && (

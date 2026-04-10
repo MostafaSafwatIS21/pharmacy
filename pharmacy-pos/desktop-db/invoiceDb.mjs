@@ -92,3 +92,30 @@ export const listInvoices = async ({
     orderBy: { createdAt: "desc" },
   });
 };
+
+export const deleteInvoice = async ({ invoiceNumber, lineIds = [] }) => {
+  const normalizedInvoiceNumber = String(invoiceNumber || "").trim();
+  const normalizedLineIds = (Array.isArray(lineIds) ? lineIds : [])
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id));
+
+  if (!normalizedInvoiceNumber && normalizedLineIds.length === 0) {
+    throw new Error("invoiceNumber or lineIds is required to delete invoice.");
+  }
+
+  if (normalizedLineIds.length > 0) {
+    return prisma.invoice.deleteMany({
+      where: {
+        id: {
+          in: normalizedLineIds,
+        },
+      },
+    });
+  }
+
+  return prisma.invoice.deleteMany({
+    where: {
+      invoiceNumber: normalizedInvoiceNumber,
+    },
+  });
+};

@@ -10,12 +10,12 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useCatalogStore } from "../store/useCatalogStore";
 
 const navItems = [
-  { to: "/import", label: "Data Import", icon: FileSpreadsheet },
-  { to: "/items", label: "Items Directory", icon: ClipboardList },
-  { to: "/customers", label: "Customers", icon: ContactRound },
-  { to: "/invoices", label: "Invoices", icon: ListOrdered },
-  { to: "/quotation", label: "Quotation", icon: ReceiptText },
-  { to: "/pos", label: "POS Invoice", icon: ShoppingCart },
+  { to: "/import", label: "استيراد البيانات", icon: FileSpreadsheet },
+  { to: "/items", label: "المنتجات", icon: ClipboardList },
+  { to: "/customers", label: "العملاء", icon: ContactRound },
+  { to: "/invoices", label: "الفواتير", icon: ListOrdered },
+  { to: "/quotation", label: "عرض السعر", icon: ReceiptText },
+  { to: "/pos", label: "فاتورة البيع", icon: ShoppingCart },
 ];
 
 function AppLayout() {
@@ -31,18 +31,18 @@ function AppLayout() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="font-display text-2xl text-slate-900 sm:text-3xl">
-                Pharmacy POS & Quotation
+                نظام الصيدلية للمبيعات وعروض الأسعار
               </h1>
               <p className="mt-1 text-sm text-slate-600">
-                Fast import, searchable catalog, and print-ready sales flow.
+                استيراد سريع، إدارة منتجات، وفواتير جاهزة للطباعة.
               </p>
             </div>
             <div className="flex gap-2 text-xs sm:text-sm">
               <span className="rounded-full bg-slate-900 px-3 py-1 font-semibold text-white">
-                Items: {itemsCount}
+                المنتجات: {itemsCount}
               </span>
               <span className="rounded-full bg-emerald-600 px-3 py-1 font-semibold text-white">
-                Selected: {selectedCount}
+                المختار: {selectedCount}
               </span>
             </div>
           </div>

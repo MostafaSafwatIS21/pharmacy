@@ -111,12 +111,12 @@ export const updateCustomer = async (payload) => {
   return customer;
 };
 
-export const deleteCustomer = async ({ id }) => {
+export const deleteCustomer = async ({ id, name }) => {
   const bridge = getDesktopBridge();
 
   if (bridge?.deleteCustomer) {
     try {
-      return await bridge.deleteCustomer({ id });
+      return await bridge.deleteCustomer({ id, name });
     } catch (error) {
       if (!isMissingHandlerError(error)) {
         throw error;
@@ -124,9 +124,16 @@ export const deleteCustomer = async ({ id }) => {
     }
   }
 
-  const customers = readLocalCustomers().filter(
-    (item) => Number(item.id) !== Number(id),
-  );
+  const normalizedName = String(name || "").trim();
+  const hasValidId = Number.isFinite(Number(id));
+
+  const customers = readLocalCustomers().filter((item) => {
+    if (hasValidId) {
+      return Number(item.id) !== Number(id);
+    }
+
+    return String(item.name || "").trim() !== normalizedName;
+  });
   writeLocalCustomers(customers);
-  return { id };
+  return { id, name };
 };

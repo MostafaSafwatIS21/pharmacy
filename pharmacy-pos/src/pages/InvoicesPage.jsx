@@ -1,8 +1,15 @@
-import { Search } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { listInvoiceLines } from "../services/invoiceDataSource";
+import {
+  deleteInvoiceGroup,
+  listInvoiceLines,
+} from "../services/invoiceDataSource";
 
-const formatCurrency = (value) => `$${Number(value || 0).toFixed(2)}`;
+const formatCurrency = (value) =>
+  new Intl.NumberFormat("ar-EG", {
+    style: "currency",
+    currency: "EGP",
+  }).format(Number(value || 0));
 
 function InvoicesPage() {
   const [invoices, setInvoices] = useState([]);
@@ -10,7 +17,36 @@ function InvoicesPage() {
   const [customerFilter, setCustomerFilter] = useState("");
   const [expandedInvoiceId, setExpandedInvoiceId] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [deletingInvoiceId, setDeletingInvoiceId] = useState("");
   const [message, setMessage] = useState("");
+
+  const handleDeleteInvoice = async (invoice) => {
+    const confirmed = window.confirm("هل أنت متأكد من حذف هذه الفاتورة؟");
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingInvoiceId(invoice.groupId);
+    setMessage("");
+
+    try {
+      const result = await deleteInvoiceGroup({
+        invoiceNumber: invoice.invoiceNumber,
+        lineIds: invoice.lines.map((line) => line.id),
+      });
+      setMessage(
+        `تم حذف الفاتورة. عدد السطور المحذوفة: ${result.deletedCount}.`,
+      );
+      setExpandedInvoiceId((current) =>
+        current === invoice.groupId ? "" : current,
+      );
+      setReloadKey((value) => value + 1);
+    } catch (error) {
+      setMessage(error.message || "فشل حذف الفاتورة.");
+    } finally {
+      setDeletingInvoiceId("");
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -26,7 +62,7 @@ function InvoicesPage() {
       })
       .catch((error) => {
         if (active) {
-          setMessage(error.message || "Failed to load invoices.");
+          setMessage(error.message || "تعذر تحميل الفواتير.");
         }
       });
 
@@ -49,7 +85,8 @@ function InvoicesPage() {
 
       if (!grouped.has(key)) {
         grouped.set(key, {
-          invoiceNumber: key,
+          groupId: key,
+          invoiceNumber: String(line.invoiceNumber || "").trim(),
           customerName: line.customerName,
           createdAt: line.createdAt,
           lines: [],
@@ -78,9 +115,11 @@ function InvoicesPage() {
   return (
     <section className="space-y-6">
       <div>
-        <h2 className="font-display text-2xl text-slate-900">Saved Invoices</h2>
+        <h2 className="font-display text-2xl text-slate-900">
+          الفواتير المحفوظة
+        </h2>
         <p className="mt-1 text-slate-600">
-          View saved invoices grouped by invoice number.
+          عرض الفواتير المحفوظة مجمعة برقم الفاتورة.
         </p>
       </div>
 
@@ -90,7 +129,7 @@ function InvoicesPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by customer or product"
+            placeholder="بحث بالعميل أو المنتج أو رقم الفاتورة"
             className="w-full border-none bg-transparent text-sm text-slate-800 outline-none"
           />
         </label>
@@ -102,7 +141,7 @@ function InvoicesPage() {
         >
           {customerOptions.map((name) => (
             <option key={name || "all"} value={name}>
-              {name || "All customers"}
+              {name || "كل العملاء"}
             </option>
           ))}
         </select>
@@ -112,7 +151,7 @@ function InvoicesPage() {
           onClick={() => setReloadKey((value) => value + 1)}
           className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
         >
-          Refresh
+          تحديث
         </button>
       </div>
 
@@ -121,29 +160,30 @@ function InvoicesPage() {
           <table className="w-full min-w-245 border-collapse text-left text-sm">
             <thead className="sticky top-0 bg-slate-100 text-slate-700">
               <tr>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Invoice No.</th>
-                <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3">Items</th>
-                <th className="px-4 py-3">Total</th>
-                <th className="px-4 py-3">Details</th>
+                <th className="px-4 py-3">التاريخ</th>
+                <th className="px-4 py-3">رقم الفاتورة</th>
+                <th className="px-4 py-3">العميل</th>
+                <th className="px-4 py-3">عدد الأصناف</th>
+                <th className="px-4 py-3">الإجمالي</th>
+                <th className="px-4 py-3">الإجراءات</th>
               </tr>
             </thead>
             <tbody>
               {groupedInvoices.map((invoice) => {
-                const expanded = expandedInvoiceId === invoice.invoiceNumber;
+                const expanded = expandedInvoiceId === invoice.groupId;
+                const isDeleting = deletingInvoiceId === invoice.groupId;
 
                 return (
-                  <Fragment key={invoice.invoiceNumber}>
+                  <Fragment key={invoice.groupId}>
                     <tr
-                      key={invoice.invoiceNumber}
+                      key={invoice.groupId}
                       className="border-t border-slate-100"
                     >
                       <td className="px-4 py-3 text-slate-700">
-                        {new Date(invoice.createdAt).toLocaleString()}
+                        {new Date(invoice.createdAt).toLocaleString("ar-EG")}
                       </td>
                       <td className="px-4 py-3 font-semibold text-slate-900">
-                        {invoice.invoiceNumber}
+                        {invoice.groupId}
                       </td>
                       <td className="px-4 py-3 text-slate-700">
                         {invoice.customerName}
@@ -155,24 +195,35 @@ function InvoicesPage() {
                         {formatCurrency(invoice.total)}
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedInvoiceId((current) =>
-                              current === invoice.invoiceNumber
-                                ? ""
-                                : invoice.invoiceNumber,
-                            )
-                          }
-                          className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700"
-                        >
-                          {expanded ? "Hide" : "View"}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedInvoiceId((current) =>
+                                current === invoice.groupId
+                                  ? ""
+                                  : invoice.groupId,
+                              )
+                            }
+                            className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700"
+                          >
+                            {expanded ? "إخفاء" : "عرض"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteInvoice(invoice)}
+                            disabled={isDeleting}
+                            className="inline-flex items-center gap-1 rounded-lg border border-rose-300 px-2 py-1 text-xs font-semibold text-rose-700 disabled:opacity-60"
+                          >
+                            <Trash2 size={13} />
+                            {isDeleting ? "جارٍ الحذف..." : "حذف"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     {expanded && (
                       <tr
-                        key={`${invoice.invoiceNumber}-lines`}
+                        key={`${invoice.groupId}-lines`}
                         className="border-t border-slate-100 bg-slate-50"
                       >
                         <td colSpan={6} className="px-4 py-3">
@@ -180,10 +231,10 @@ function InvoicesPage() {
                             <table className="w-full border-collapse text-left text-xs">
                               <thead>
                                 <tr className="text-slate-600">
-                                  <th className="px-2 py-1">Product</th>
-                                  <th className="px-2 py-1">Unit Price</th>
-                                  <th className="px-2 py-1">Qty</th>
-                                  <th className="px-2 py-1">Line Total</th>
+                                  <th className="px-2 py-1">المنتج</th>
+                                  <th className="px-2 py-1">سعر الوحدة</th>
+                                  <th className="px-2 py-1">الكمية</th>
+                                  <th className="px-2 py-1">إجمالي السطر</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -224,7 +275,7 @@ function InvoicesPage() {
       </div>
 
       <p className="text-sm text-slate-700">
-        Invoices: {groupedInvoices.length} | Total value:{" "}
+        الفواتير: {groupedInvoices.length} | إجمالي القيمة:{" "}
         {formatCurrency(totalAmount)}
       </p>
       {message && (

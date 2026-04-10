@@ -86,7 +86,7 @@ function DataImportPage() {
 
   useEffect(() => {
     loadCatalog({ setImportedData }).catch(() => {
-      setMessage("Failed to load desktop database catalog.");
+      setMessage("تعذر تحميل بيانات قاعدة البيانات.");
     });
   }, [setImportedData]);
 
@@ -132,7 +132,7 @@ function DataImportPage() {
       }
 
       if (importedItems.length === 0) {
-        setMessage("No valid rows found. Check Name and Price columns.");
+        setMessage("لا توجد صفوف صحيحة. تأكد من أعمدة الاسم والسعر.");
         return;
       }
 
@@ -150,13 +150,13 @@ function DataImportPage() {
       });
 
       setMessage(
-        `Imported ${importedItems.length} items from ${importedFileNames.length} file(s). Total records: ${mergedItems.length}.${
-          skippedFiles > 0 ? ` Skipped ${skippedFiles} invalid file(s).` : ""
+        `تم استيراد ${importedItems.length} منتج من ${importedFileNames.length} ملف. إجمالي السجلات: ${mergedItems.length}.${
+          skippedFiles > 0 ? ` تم تخطي ${skippedFiles} ملف غير صالح.` : ""
         }`,
       );
       setTimeout(() => navigate("/items"), 500);
     } catch (error) {
-      setMessage(error.message || "Failed to parse file.");
+      setMessage(error.message || "فشل في قراءة الملف.");
     } finally {
       setIsLoading(false);
     }
@@ -172,10 +172,11 @@ function DataImportPage() {
   return (
     <section className="space-y-6">
       <div>
-        <h2 className="font-display text-2xl text-slate-900">Data Import</h2>
+        <h2 className="font-display text-2xl text-slate-900">
+          استيراد البيانات
+        </h2>
         <p className="mt-1 text-slate-600">
-          Upload one or multiple Excel/CSV files to append items into your
-          directory.
+          ارفع ملف Excel/CSV واحد أو أكثر لإضافة المنتجات إلى قاعدة البيانات.
         </p>
       </div>
 
@@ -198,10 +199,10 @@ function DataImportPage() {
       >
         <UploadCloud className="mx-auto mb-4 text-slate-700" size={44} />
         <p className="text-lg font-semibold text-slate-900">
-          Drop your file(s) here or click to upload
+          اسحب الملفات هنا أو اضغط للرفع
         </p>
         <p className="mt-2 text-sm text-slate-600">
-          Supported formats: .xlsx, .xls, .csv (single or multiple files)
+          الصيغ المدعومة: .xlsx, .xls, .csv (ملف واحد أو عدة ملفات)
         </p>
       </div>
 
@@ -217,8 +218,8 @@ function DataImportPage() {
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
         <div className="flex items-center gap-2">
           <FileUp size={18} className="text-slate-500" />
-          <span className="font-medium">Required columns:</span>
-          <span>Name and Price (extra columns are optional)</span>
+          <span className="font-medium">الأعمدة المطلوبة:</span>
+          <span>name و price (الأعمدة الإضافية اختيارية)</span>
         </div>
       </div>
 
@@ -227,30 +228,30 @@ function DataImportPage() {
           <div className="flex items-center gap-2">
             <Database size={18} className="text-slate-500" />
             <span>
-              Database status: {itemsCount} records
+              حالة قاعدة البيانات: {itemsCount} سجل
               {sourceFileName ? ` (from ${sourceFileName})` : ""}
             </span>
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-              {hasDesktopDbBridge() ? "Desktop DB" : "Local fallback"}
+              {hasDesktopDbBridge() ? "قاعدة سطح المكتب" : "تخزين محلي"}
             </span>
           </div>
           <button
             type="button"
             onClick={async () => {
               await clearCatalogData({ clearDatabase });
-              setMessage("Database cleared. You can import a new file.");
+              setMessage("تم مسح البيانات. يمكنك استيراد ملف جديد.");
             }}
             className="inline-flex items-center gap-1 rounded-lg border border-rose-300 px-3 py-1.5 text-sm font-semibold text-rose-700"
           >
             <Trash2 size={14} />
-            Delete Current Data
+            حذف البيانات الحالية
           </button>
         </div>
       </div>
 
       {isLoading && (
         <p className="text-sm font-semibold text-sky-700">
-          Importing and merging your file(s)...
+          جاري استيراد ودمج الملفات...
         </p>
       )}
       {message && (
