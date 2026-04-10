@@ -1,7 +1,7 @@
 import path from "node:path";
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -103,16 +103,25 @@ const createWindow = async () => {
   }
 };
 
-app.whenReady().then(async () => {
-  await registerIpcHandlers();
-  await createWindow();
+app
+  .whenReady()
+  .then(async () => {
+    await registerIpcHandlers();
+    await createWindow();
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  })
+  .catch((error) => {
+    const message = String(
+      error?.stack || error?.message || error || "Unknown startup error",
+    );
+    dialog.showErrorBox("Pharmacy POS Startup Error", message);
+    app.quit();
   });
-});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
