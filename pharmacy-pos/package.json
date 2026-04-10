@@ -1,0 +1,48 @@
+{
+  "name": "pharmacy-pos",
+  "private": true,
+  "version": "0.0.0",
+  "main": "electron/main.mjs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:desktop": "concurrently -k \"npm:dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "vite build",
+    "build:desktop": "npm run build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:seed": "node scripts/db-seed.mjs",
+    "db:cli": "node scripts/db-cli.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.15.0",
+    "@tailwindcss/vite": "^4.2.2",
+    "lucide-react": "^1.8.0",
+    "papaparse": "^5.5.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.14.0",
+    "react-to-print": "^3.3.0",
+    "tailwindcss": "^4.2.2",
+    "xlsx": "^0.18.5",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "electron": "^41.2.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
+    "prisma": "^6.15.0",
+    "vite": "^8.0.4",
+    "wait-on": "^9.0.4"
+  }
+}

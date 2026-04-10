@@ -1,0 +1,41 @@
+name,description,price,category
+Paracetamol 500mg 20 tabs,Pain reliever and fever reducer,25,Analgesic
+Ibuprofen 400mg 20 tabs,Anti-inflammatory pain relief,34,Analgesic
+Diclofenac 50mg 20 tabs,Muscle and joint pain relief,29,Analgesic
+Amoxicillin 500mg 16 caps,Broad-spectrum antibiotic,68,Antibiotic
+Azithromycin 500mg 3 tabs,Respiratory infection treatment,72,Antibiotic
+Ciprofloxacin 500mg 10 tabs,Urinary and bacterial infection treatment,64,Antibiotic
+Cefixime 400mg 5 tabs,Oral cephalosporin antibiotic,85,Antibiotic
+Loratadine 10mg 10 tabs,Non-drowsy allergy relief,22,Allergy
+Cetirizine 10mg 20 tabs,Allergy symptom control,24,Allergy
+Fexofenadine 120mg 10 tabs,Seasonal allergy management,46,Allergy
+Omeprazole 20mg 14 caps,Acid reflux and heartburn relief,40,Gastro
+Pantoprazole 40mg 14 tabs,Stomach acid suppression,48,Gastro
+Domperidone 10mg 30 tabs,Nausea and gastric motility support,36,Gastro
+ORS Sachet 20g,Oral rehydration salts,8,Gastro
+Simethicone 40mg 30 chew tabs,Gas and bloating relief,18,Gastro
+Vitamin C 1000mg 20 eff tabs,Immune support supplement,39,Supplement
+Vitamin D3 5000 IU 30 softgels,Bone and immunity support,55,Supplement
+Zinc 25mg 30 tabs,Immune and skin support,31,Supplement
+Multivitamin 30 tabs,Daily nutritional support,44,Supplement
+Omega 3 1000mg 30 softgels,Cardiovascular support,58,Supplement
+Metformin 500mg 30 tabs,Type 2 diabetes management,27,Chronic Care
+Gliclazide MR 60mg 30 tabs,Blood sugar control,49,Chronic Care
+Amlodipine 5mg 30 tabs,Blood pressure management,21,Chronic Care
+Losartan 50mg 30 tabs,Hypertension management,33,Chronic Care
+Atorvastatin 20mg 30 tabs,Cholesterol management,52,Chronic Care
+Salbutamol Inhaler 100mcg 200 doses,Bronchodilator for asthma,78,Respiratory
+Budesonide Inhaler 200mcg 120 doses,Preventive asthma controller,126,Respiratory
+Dextromethorphan Syrup 100ml,Dry cough suppressant,26,Respiratory
+Ambroxol Syrup 120ml,Productive cough relief,24,Respiratory
+Nasal Saline Spray 30ml,Nasal moisture and congestion relief,19,Respiratory
+Povidone Iodine 10 percent 120ml,Topical antiseptic solution,32,First Aid
+Hydrogen Peroxide 3 percent 100ml,Disinfectant for minor wounds,14,First Aid
+Sterile Gauze Pads 10 pack,Wound dressing material,17,First Aid
+Adhesive Bandages 40 strips,Minor cuts and blister protection,15,First Aid
+Digital Thermometer,Fast body temperature reading,95,Device
+Blood Pressure Monitor Arm Type,Automatic BP measurement,520,Device
+Glucometer Starter Kit,Home blood glucose monitoring,310,Device
+Insulin Syringes 1ml 10 pack,Single-use sterile syringes,45,Diabetes Care
+Lancets 100 pcs,Finger-prick sampling needles,28,Diabetes Care
+Pregnancy Test Kit,Home pregnancy detection,35,Diagnostics
