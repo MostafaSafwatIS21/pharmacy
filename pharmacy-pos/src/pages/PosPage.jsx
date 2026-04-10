@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
 import { Link } from "react-router-dom";
 import { addCustomer, listCustomers } from "../services/customerDataSource";
+import { saveInvoiceLines } from "../services/invoiceDataSource";
 import { useCatalogStore } from "../store/useCatalogStore";
 
 const formatCurrency = (value) => `$${value.toFixed(2)}`;
@@ -20,6 +21,7 @@ function PosPage() {
     phoneNumber: "",
   });
   const [customerMessage, setCustomerMessage] = useState("");
+  const [invoiceMessage, setInvoiceMessage] = useState("");
   const [taxRate, setTaxRate] = useState(14);
   const [showQuantity, setShowQuantity] = useState(true);
   const [showLineTotal, setShowLineTotal] = useState(true);
@@ -95,6 +97,22 @@ function PosPage() {
     }
   };
 
+  const handleSaveInvoice = async () => {
+    setInvoiceMessage("");
+
+    try {
+      const result = await saveInvoiceLines({
+        customerName,
+        lineItems,
+      });
+      setInvoiceMessage(
+        `Invoice ${result.invoiceNumber} saved with ${result.rowsSaved} item(s).`,
+      );
+    } catch (error) {
+      setInvoiceMessage(error.message || "Failed to save invoice.");
+    }
+  };
+
   const today = new Date();
 
   if (selectedItems.length === 0) {
@@ -129,6 +147,13 @@ function PosPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleSaveInvoice}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-900 px-4 py-2 text-sm font-semibold text-slate-900"
+            >
+              Save Invoice
+            </button>
             <button
               type="button"
               onClick={handlePrint}
@@ -247,6 +272,11 @@ function PosPage() {
         {customerMessage && (
           <p className="mt-2 text-sm font-medium text-slate-700">
             {customerMessage}
+          </p>
+        )}
+        {invoiceMessage && (
+          <p className="mt-2 text-sm font-medium text-slate-700">
+            {invoiceMessage}
           </p>
         )}
 

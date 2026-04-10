@@ -6,6 +6,9 @@ contextBridge.exposeInMainWorld("pharmacyDb", {
   clearCatalog: () => ipcRenderer.invoke("catalog:clear"),
   updateCatalogField: (payload) =>
     ipcRenderer.invoke("catalog:updateField", payload),
+  addCatalogItem: (payload) => ipcRenderer.invoke("catalog:addItem", payload),
+  deleteCatalogItems: (payload) =>
+    ipcRenderer.invoke("catalog:deleteItems", payload),
 
   addCustomer: (payload) => ipcRenderer.invoke("customer:add", payload),
   listCustomers: (payload) => ipcRenderer.invoke("customer:list", payload),

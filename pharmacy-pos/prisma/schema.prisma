@@ -32,6 +32,7 @@ model Customer {
 
 model Invoice {
   id           Int      @id @default(autoincrement())
+  invoiceNumber String  @default("")
   productName  String
   price        Float
   qty          Int

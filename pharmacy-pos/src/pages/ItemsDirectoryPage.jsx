@@ -1,7 +1,12 @@
 import { Search, Trash2 } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { loadCatalog, saveEditedField } from "../services/catalogDataSource";
+import {
+  addProduct,
+  deleteProducts,
+  loadCatalog,
+  saveEditedField,
+} from "../services/catalogDataSource";
 import { useCatalogStore } from "../store/useCatalogStore";
 
 function ItemsDirectoryPage() {
@@ -9,6 +14,11 @@ function ItemsDirectoryPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [pageSize, setPageSize] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
+  const [newName, setNewName] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const [message, setMessage] = useState("");
+  const [editingRowId, setEditingRowId] = useState(null);
+  const [editingValues, setEditingValues] = useState({});
 
   const items = useCatalogStore((state) => state.items);
   const headers = useCatalogStore((state) => state.headers);
@@ -18,6 +28,8 @@ function ItemsDirectoryPage() {
   const clearSelection = useCatalogStore((state) => state.clearSelection);
   const setSelection = useCatalogStore((state) => state.setSelection);
   const updateItemField = useCatalogStore((state) => state.updateItemField);
+  const addItem = useCatalogStore((state) => state.addItem);
+  const removeItems = useCatalogStore((state) => state.removeItems);
   const setImportedData = useCatalogStore((state) => state.setImportedData);
 
   useEffect(() => {
@@ -96,16 +108,85 @@ function ItemsDirectoryPage() {
     setSelection(Array.from(union));
   };
 
-  const commitCellEdit = (itemId, header, value) => {
-    saveEditedField({
-      itemId,
-      header,
-      value,
-      setImportedData,
-      updateItemField,
-    }).catch(() => {
-      updateItemField(itemId, header, value);
+  const startRowEdit = (item) => {
+    const draft = {};
+    visibleHeaders.forEach((header) => {
+      draft[header] = item.fields?.[header] ?? "";
     });
+    setEditingRowId(item.id);
+    setEditingValues(draft);
+  };
+
+  const cancelRowEdit = () => {
+    setEditingRowId(null);
+    setEditingValues({});
+  };
+
+  const commitRowEdit = async (item) => {
+    const updates = visibleHeaders.filter(
+      (header) =>
+        (item.fields?.[header] ?? "") !== (editingValues[header] ?? ""),
+    );
+
+    if (updates.length === 0) {
+      cancelRowEdit();
+      return;
+    }
+
+    try {
+      for (const header of updates) {
+        await saveEditedField({
+          itemId: item.id,
+          header,
+          value: editingValues[header] ?? "",
+          setImportedData,
+          updateItemField,
+        });
+      }
+      setMessage("Product updated.");
+      cancelRowEdit();
+    } catch (error) {
+      setMessage(error.message || "Failed to update product.");
+    }
+  };
+
+  const handleAddProduct = async () => {
+    setMessage("");
+
+    try {
+      await addProduct({
+        name: newName,
+        price: newPrice,
+        setImportedData,
+        addLocalItem: addItem,
+      });
+      setNewName("");
+      setNewPrice("");
+      setMessage("Product added.");
+    } catch (error) {
+      setMessage(error.message || "Failed to add product.");
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedItemIds.length === 0) {
+      setMessage("Select products to delete.");
+      return;
+    }
+
+    setMessage("");
+
+    try {
+      await deleteProducts({
+        itemIds: selectedItemIds,
+        setImportedData,
+        removeLocalItems: removeItems,
+      });
+      clearSelection();
+      setMessage("Selected products deleted.");
+    } catch (error) {
+      setMessage(error.message || "Failed to delete products.");
+    }
   };
 
   if (items.length === 0) {
@@ -186,11 +267,11 @@ function ItemsDirectoryPage() {
 
         <button
           type="button"
-          onClick={clearSelection}
+          onClick={handleDeleteSelected}
           className="inline-flex items-center justify-center gap-1 rounded-xl border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700"
         >
           <Trash2 size={14} />
-          Clear
+          Delete Selected
         </button>
 
         <select
@@ -204,6 +285,28 @@ function ItemsDirectoryPage() {
         </select>
       </div>
 
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-[1fr_200px_auto]">
+        <input
+          value={newName}
+          onChange={(event) => setNewName(event.target.value)}
+          placeholder="New product name"
+          className="rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-700"
+        />
+        <input
+          value={newPrice}
+          onChange={(event) => setNewPrice(event.target.value)}
+          placeholder="Price"
+          className="rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-700"
+        />
+        <button
+          type="button"
+          onClick={handleAddProduct}
+          className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
+        >
+          Add Product
+        </button>
+      </div>
+
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="max-h-125 overflow-auto">
           <table className="w-full min-w-245 border-collapse text-left text-sm">
@@ -215,11 +318,13 @@ function ItemsDirectoryPage() {
                     {header}
                   </th>
                 ))}
+                <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
               {visibleItems.map((item) => {
                 const isSelected = selectedIdSet.has(item.id);
+                const isEditing = editingRowId === item.id;
 
                 return (
                   <tr
@@ -239,32 +344,74 @@ function ItemsDirectoryPage() {
                       />
                     </td>
                     {visibleHeaders.map((header) => {
-                      const isPriceColumn = header === mapping.priceHeader;
-                      const value = item.fields?.[header] ?? "";
+                      const value = isEditing
+                        ? (editingValues[header] ?? "")
+                        : (item.fields?.[header] ?? "");
 
                       return (
                         <td key={`${item.id}-${header}`} className="px-4 py-2">
-                          <input
-                            defaultValue={value}
-                            type={isPriceColumn ? "text" : "text"}
-                            onClick={(event) => event.stopPropagation()}
-                            onBlur={(event) =>
-                              commitCellEdit(
-                                item.id,
-                                header,
-                                event.target.value,
-                              )
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.currentTarget.blur();
+                          {isEditing ? (
+                            <input
+                              value={value}
+                              type="text"
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={(event) =>
+                                setEditingValues((current) => ({
+                                  ...current,
+                                  [header]: event.target.value,
+                                }))
                               }
-                            }}
-                            className="w-full rounded border border-slate-200 px-2 py-1 text-sm text-slate-800 outline-none focus:border-slate-500"
-                          />
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  commitRowEdit(item);
+                                }
+                              }}
+                              className="w-full rounded border border-slate-200 px-2 py-1 text-sm text-slate-800 outline-none focus:border-slate-500"
+                            />
+                          ) : (
+                            <span className="text-slate-800">{value}</span>
+                          )}
                         </td>
                       );
                     })}
+                    <td className="px-4 py-2">
+                      {isEditing ? (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              commitRowEdit(item);
+                            }}
+                            className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
+                          >
+                            Update
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              cancelRowEdit();
+                            }}
+                            className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            startRowEdit(item);
+                          }}
+                          className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
@@ -299,6 +446,9 @@ function ItemsDirectoryPage() {
           Next
         </button>
       </div>
+      {message && (
+        <p className="text-sm font-medium text-slate-800">{message}</p>
+      )}
     </section>
   );
 }

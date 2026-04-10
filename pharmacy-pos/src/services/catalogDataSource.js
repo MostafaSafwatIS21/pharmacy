@@ -74,3 +74,38 @@ export const saveEditedField = async ({
 
   updateItemField(itemId, header, value);
 };
+
+export const addProduct = async ({
+  name,
+  price,
+  setImportedData,
+  addLocalItem,
+}) => {
+  const bridge = getDesktopBridge();
+
+  if (bridge?.addCatalogItem && bridge?.getCatalog) {
+    await bridge.addCatalogItem({ name, price });
+    const storedCatalog = await bridge.getCatalog();
+    setImportedData(storedCatalog);
+    return;
+  }
+
+  addLocalItem({ name, price });
+};
+
+export const deleteProducts = async ({
+  itemIds,
+  setImportedData,
+  removeLocalItems,
+}) => {
+  const bridge = getDesktopBridge();
+
+  if (bridge?.deleteCatalogItems && bridge?.getCatalog) {
+    await bridge.deleteCatalogItems({ ids: itemIds });
+    const storedCatalog = await bridge.getCatalog();
+    setImportedData(storedCatalog);
+    return;
+  }
+
+  removeLocalItems(itemIds);
+};

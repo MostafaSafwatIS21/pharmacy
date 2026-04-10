@@ -3,6 +3,7 @@ import AppLayout from "./layouts/AppLayout";
 import DataImportPage from "./pages/DataImportPage";
 import ItemsDirectoryPage from "./pages/ItemsDirectoryPage";
 import CustomersPage from "./pages/CustomersPage";
+import InvoicesPage from "./pages/InvoicesPage";
 import PosPage from "./pages/PosPage";
 import QuotationPage from "./pages/QuotationPage";
 
@@ -14,6 +15,7 @@ function App() {
         <Route path="/import" element={<DataImportPage />} />
         <Route path="/items" element={<ItemsDirectoryPage />} />
         <Route path="/customers" element={<CustomersPage />} />
+        <Route path="/invoices" element={<InvoicesPage />} />
         <Route path="/quotation" element={<QuotationPage />} />
         <Route path="/pos" element={<PosPage />} />
       </Route>

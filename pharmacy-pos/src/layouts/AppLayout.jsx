@@ -2,6 +2,7 @@ import {
   ClipboardList,
   ContactRound,
   FileSpreadsheet,
+  ListOrdered,
   ReceiptText,
   ShoppingCart,
 } from "lucide-react";
@@ -12,6 +13,7 @@ const navItems = [
   { to: "/import", label: "Data Import", icon: FileSpreadsheet },
   { to: "/items", label: "Items Directory", icon: ClipboardList },
   { to: "/customers", label: "Customers", icon: ContactRound },
+  { to: "/invoices", label: "Invoices", icon: ListOrdered },
   { to: "/quotation", label: "Quotation", icon: ReceiptText },
   { to: "/pos", label: "POS Invoice", icon: ShoppingCart },
 ];

@@ -57,6 +57,7 @@ export const ensureDesktopSchema = async () => {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Invoice" (
       "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+      "invoiceNumber" TEXT NOT NULL DEFAULT '',
       "productName" TEXT NOT NULL,
       "price" REAL NOT NULL,
       "qty" INTEGER NOT NULL,
@@ -65,4 +66,13 @@ export const ensureDesktopSchema = async () => {
       "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  try {
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "Invoice"
+      ADD COLUMN "invoiceNumber" TEXT NOT NULL DEFAULT ''
+    `);
+  } catch {
+    // Column already exists in databases that were already upgraded.
+  }
 };

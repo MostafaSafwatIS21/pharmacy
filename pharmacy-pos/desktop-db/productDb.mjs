@@ -160,6 +160,44 @@ export const clearCatalog = async () => {
   });
 };
 
+export const addCatalogItem = async ({ name, price }) => {
+  const normalizedName = String(name || "").trim();
+  const normalizedPrice = parseNumber(price);
+
+  if (!normalizedName) {
+    throw new Error("Product name is required.");
+  }
+
+  await prisma.product.create({
+    data: {
+      name: normalizedName,
+      price: normalizedPrice,
+    },
+  });
+
+  return getCatalog();
+};
+
+export const deleteCatalogItems = async ({ ids = [] } = {}) => {
+  const normalizedIds = (ids || [])
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id));
+
+  if (normalizedIds.length === 0) {
+    return getCatalog();
+  }
+
+  await prisma.product.deleteMany({
+    where: {
+      id: {
+        in: normalizedIds,
+      },
+    },
+  });
+
+  return getCatalog();
+};
+
 export const listProducts = async ({ search = "" } = {}) => {
   const where = search
     ? {

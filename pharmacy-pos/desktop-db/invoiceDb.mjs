@@ -1,11 +1,13 @@
 import { prisma } from "./prismaClient.mjs";
 
 export const saveInvoice = async ({
+  invoiceNumber,
   productName,
   price,
   qty,
   customerName,
 }) => {
+  const normalizedInvoiceNumber = String(invoiceNumber || "").trim();
   const normalizedProductName = String(productName || "").trim();
   const normalizedCustomerName = String(customerName || "").trim();
   const numericPrice = Number(price);
@@ -25,6 +27,7 @@ export const saveInvoice = async ({
 
   return prisma.invoice.create({
     data: {
+      invoiceNumber: normalizedInvoiceNumber,
       productName: normalizedProductName,
       price: numericPrice,
       qty: Math.floor(numericQty),
@@ -44,6 +47,11 @@ export const listInvoices = async ({
   if (search) {
     andConditions.push({
       OR: [
+        {
+          invoiceNumber: {
+            contains: search,
+          },
+        },
         {
           productName: {
             contains: search,

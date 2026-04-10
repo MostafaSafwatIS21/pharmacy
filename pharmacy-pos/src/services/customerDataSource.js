@@ -8,6 +8,9 @@ const getDesktopBridge = () => {
   return window.pharmacyDb || null;
 };
 
+const isMissingHandlerError = (error) =>
+  String(error?.message || error || "").includes("No handler registered");
+
 const readLocalCustomers = () => {
   if (typeof window === "undefined") {
     return [];
@@ -41,7 +44,13 @@ export const listCustomers = async ({ search = "" } = {}) => {
   const bridge = getDesktopBridge();
 
   if (bridge?.listCustomers) {
-    return bridge.listCustomers({ search });
+    try {
+      return await bridge.listCustomers({ search });
+    } catch (error) {
+      if (!isMissingHandlerError(error)) {
+        throw error;
+      }
+    }
   }
 
   const normalizedSearch = String(search || "")
@@ -65,7 +74,13 @@ export const addCustomer = async (payload) => {
   const bridge = getDesktopBridge();
 
   if (bridge?.addCustomer) {
-    return bridge.addCustomer(payload);
+    try {
+      return await bridge.addCustomer(payload);
+    } catch (error) {
+      if (!isMissingHandlerError(error)) {
+        throw error;
+      }
+    }
   }
 
   const customer = normalize(payload);
@@ -79,7 +94,13 @@ export const updateCustomer = async (payload) => {
   const bridge = getDesktopBridge();
 
   if (bridge?.updateCustomer) {
-    return bridge.updateCustomer(payload);
+    try {
+      return await bridge.updateCustomer(payload);
+    } catch (error) {
+      if (!isMissingHandlerError(error)) {
+        throw error;
+      }
+    }
   }
 
   const customer = normalize(payload);
@@ -94,7 +115,13 @@ export const deleteCustomer = async ({ id }) => {
   const bridge = getDesktopBridge();
 
   if (bridge?.deleteCustomer) {
-    return bridge.deleteCustomer({ id });
+    try {
+      return await bridge.deleteCustomer({ id });
+    } catch (error) {
+      if (!isMissingHandlerError(error)) {
+        throw error;
+      }
+    }
   }
 
   const customers = readLocalCustomers().filter(

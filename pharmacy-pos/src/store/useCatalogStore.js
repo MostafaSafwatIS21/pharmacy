@@ -100,6 +100,42 @@ export const useCatalogStore = create(
         set({
           selectedItemIds: [],
         }),
+      addItem: ({ name, price }) =>
+        set((state) => {
+          const normalizedName = String(name || "").trim();
+          const normalizedPrice = parseNumericPrice(price);
+
+          if (!normalizedName) {
+            return state;
+          }
+
+          const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          const nextItem = {
+            id,
+            name: normalizedName,
+            price: normalizedPrice,
+            details: "",
+            type: "General",
+            fields: {
+              name: normalizedName,
+              price: String(normalizedPrice),
+            },
+          };
+
+          return {
+            items: [...state.items, nextItem],
+          };
+        }),
+      removeItems: (itemIds) =>
+        set((state) => {
+          const idSet = new Set(itemIds || []);
+          return {
+            items: state.items.filter((item) => !idSet.has(item.id)),
+            selectedItemIds: state.selectedItemIds.filter(
+              (id) => !idSet.has(id),
+            ),
+          };
+        }),
     }),
     {
       name: "pharmacy-pos-db-v1",

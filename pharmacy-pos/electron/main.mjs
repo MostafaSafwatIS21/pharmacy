@@ -48,6 +48,12 @@ const registerIpcHandlers = async () => {
   ipcMain.handle("catalog:updateField", async (_event, payload) =>
     productDb.updateCatalogField(payload),
   );
+  ipcMain.handle("catalog:addItem", async (_event, payload) =>
+    productDb.addCatalogItem(payload),
+  );
+  ipcMain.handle("catalog:deleteItems", async (_event, payload) =>
+    productDb.deleteCatalogItems(payload || {}),
+  );
 
   ipcMain.handle("customer:add", async (_event, payload) =>
     customerDb.addCustomer(payload),
