@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+const MAX_PERSISTED_ITEMS = 2000;
+
 const parseNumericPrice = (value) => {
   const numeric = Number(String(value).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(numeric) ? numeric : 0;
@@ -102,10 +104,11 @@ export const useCatalogStore = create(
     {
       name: "pharmacy-pos-db-v1",
       partialize: (state) => ({
-        items: state.items,
+        items: state.items.length <= MAX_PERSISTED_ITEMS ? state.items : [],
         headers: state.headers,
         mapping: state.mapping,
-        sourceFileName: state.sourceFileName,
+        sourceFileName:
+          state.items.length <= MAX_PERSISTED_ITEMS ? state.sourceFileName : "",
       }),
     },
   ),

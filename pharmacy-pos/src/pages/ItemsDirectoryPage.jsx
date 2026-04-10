@@ -1,5 +1,5 @@
 import { Search, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadCatalog, saveEditedField } from "../services/catalogDataSource";
 import { useCatalogStore } from "../store/useCatalogStore";
@@ -7,6 +7,8 @@ import { useCatalogStore } from "../store/useCatalogStore";
 function ItemsDirectoryPage() {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [pageSize, setPageSize] = useState(100);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const items = useCatalogStore((state) => state.items);
   const headers = useCatalogStore((state) => state.headers);
@@ -24,33 +26,64 @@ function ItemsDirectoryPage() {
     });
   }, [setImportedData]);
 
+  const deferredQuery = useDeferredValue(query);
+  const selectedIdSet = useMemo(
+    () => new Set(selectedItemIds),
+    [selectedItemIds],
+  );
+
   const typeOptions = useMemo(() => {
     const unique = new Set(items.map((item) => item.type || "General"));
     return ["all", ...Array.from(unique)];
   }, [items]);
 
   const filteredItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = deferredQuery.trim().toLowerCase();
 
     return items.filter((item) => {
       const matchesType = typeFilter === "all" || item.type === typeFilter;
-      const searchableText = Object.values(item.fields || {})
+      const searchableText = [
+        item.name,
+        item.type,
+        item.details,
+        item.fields?.[mapping.nameHeader],
+        item.fields?.[mapping.priceHeader],
+      ]
+        .filter(Boolean)
         .join(" ")
         .toLowerCase();
       const matchesQuery = searchableText.includes(normalizedQuery);
       return matchesType && matchesQuery;
     });
-  }, [items, query, typeFilter]);
+  }, [
+    deferredQuery,
+    items,
+    mapping.nameHeader,
+    mapping.priceHeader,
+    typeFilter,
+  ]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [deferredQuery, typeFilter, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+
+  const visibleItems = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, pageSize, safePage]);
 
   const visibleHeaders = headers.length > 0 ? headers : ["name", "price"];
 
   const allVisibleSelected =
-    filteredItems.length > 0 &&
-    filteredItems.every((item) => selectedItemIds.includes(item.id));
+    visibleItems.length > 0 &&
+    visibleItems.every((item) => selectedIdSet.has(item.id));
 
   const toggleSelectAllVisible = () => {
     if (allVisibleSelected) {
-      const visibleIds = new Set(filteredItems.map((item) => item.id));
+      const visibleIds = new Set(visibleItems.map((item) => item.id));
       const nextSelection = selectedItemIds.filter((id) => !visibleIds.has(id));
       setSelection(nextSelection);
       return;
@@ -58,9 +91,21 @@ function ItemsDirectoryPage() {
 
     const union = new Set([
       ...selectedItemIds,
-      ...filteredItems.map((item) => item.id),
+      ...visibleItems.map((item) => item.id),
     ]);
     setSelection(Array.from(union));
+  };
+
+  const commitCellEdit = (itemId, header, value) => {
+    saveEditedField({
+      itemId,
+      header,
+      value,
+      setImportedData,
+      updateItemField,
+    }).catch(() => {
+      updateItemField(itemId, header, value);
+    });
   };
 
   if (items.length === 0) {
@@ -136,7 +181,7 @@ function ItemsDirectoryPage() {
           onClick={toggleSelectAllVisible}
           className="rounded-xl border border-slate-900 px-3 py-2 text-sm font-semibold text-slate-900"
         >
-          {allVisibleSelected ? "Unselect Visible" : "Select Visible"}
+          {allVisibleSelected ? "Unselect Page" : "Select Page"}
         </button>
 
         <button
@@ -147,11 +192,21 @@ function ItemsDirectoryPage() {
           <Trash2 size={14} />
           Clear
         </button>
+
+        <select
+          value={pageSize}
+          onChange={(event) => setPageSize(Number(event.target.value))}
+          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none"
+        >
+          <option value={100}>100 / page</option>
+          <option value={250}>250 / page</option>
+          <option value={500}>500 / page</option>
+        </select>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <div className="max-h-[500px] overflow-auto">
-          <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+        <div className="max-h-125 overflow-auto">
+          <table className="w-full min-w-245 border-collapse text-left text-sm">
             <thead className="sticky top-0 bg-slate-100">
               <tr className="text-slate-700">
                 <th className="px-4 py-3">Select</th>
@@ -163,8 +218,8 @@ function ItemsDirectoryPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredItems.map((item) => {
-                const isSelected = selectedItemIds.includes(item.id);
+              {visibleItems.map((item) => {
+                const isSelected = selectedIdSet.has(item.id);
 
                 return (
                   <tr
@@ -190,23 +245,20 @@ function ItemsDirectoryPage() {
                       return (
                         <td key={`${item.id}-${header}`} className="px-4 py-2">
                           <input
-                            value={value}
+                            defaultValue={value}
                             type={isPriceColumn ? "text" : "text"}
                             onClick={(event) => event.stopPropagation()}
-                            onChange={(event) => {
-                              saveEditedField({
-                                itemId: item.id,
+                            onBlur={(event) =>
+                              commitCellEdit(
+                                item.id,
                                 header,
-                                value: event.target.value,
-                                setImportedData,
-                                updateItemField,
-                              }).catch(() => {
-                                updateItemField(
-                                  item.id,
-                                  header,
-                                  event.target.value,
-                                );
-                              });
+                                event.target.value,
+                              )
+                            }
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.currentTarget.blur();
+                              }
                             }}
                             className="w-full rounded border border-slate-200 px-2 py-1 text-sm text-slate-800 outline-none focus:border-slate-500"
                           />
@@ -222,9 +274,31 @@ function ItemsDirectoryPage() {
       </div>
 
       <p className="text-sm text-slate-700">
-        Showing {filteredItems.length} of {items.length} items. Selected:{" "}
+        Showing page {safePage} / {totalPages} ({visibleItems.length} rows) out
+        of {filteredItems.length} filtered, {items.length} total. Selected:{" "}
         {selectedItemIds.length}
       </p>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+          disabled={safePage === 1}
+          className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+          }
+          disabled={safePage === totalPages}
+          className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
     </section>
   );
 }

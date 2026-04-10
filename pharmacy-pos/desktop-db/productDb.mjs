@@ -37,46 +37,26 @@ export const replaceProducts = async (products) => {
 
   if (normalizedProducts.length > 0) {
     await prisma.product.createMany({
-      data: normalizedProducts.map((product) => ({
-        ...product,
-        fieldsJson: JSON.stringify({
-          name: product.name,
-          price: String(product.price),
-        }),
-      })),
+      data: normalizedProducts,
     });
   }
 
   return prisma.product.findMany({ orderBy: { id: "asc" } });
 };
 
-export const replaceCatalog = async ({
-  items,
-  headers,
-  mapping,
-  sourceFileName,
-}) => {
+export const replaceCatalog = async ({ items, sourceFileName }) => {
   const validItems = (items || [])
     .map((item) => {
       const name = String(item?.name || "").trim();
-      const price = parseNumber(
-        item?.price ?? item?.fields?.[mapping?.priceHeader || "price"],
-      );
+      const price = parseNumber(item?.price);
 
       if (!name) {
         return null;
       }
 
-      const fields = item?.fields || {
-        [mapping?.nameHeader || "name"]: name,
-        [mapping?.priceHeader || "price"]: String(price),
-      };
-
       return {
-        externalId: String(item?.id || crypto.randomUUID()),
         name,
         price,
-        fieldsJson: JSON.stringify(fields),
       };
     })
     .filter(Boolean);
@@ -91,14 +71,14 @@ export const replaceCatalog = async ({
     await tx.catalogState.upsert({
       where: { id: 1 },
       update: {
-        headersJson: JSON.stringify(headers || []),
-        mappingJson: JSON.stringify(mapping || DEFAULT_MAPPING),
+        headersJson: JSON.stringify(["name", "price"]),
+        mappingJson: JSON.stringify(DEFAULT_MAPPING),
         sourceFileName: sourceFileName || null,
       },
       create: {
         id: 1,
-        headersJson: JSON.stringify(headers || []),
-        mappingJson: JSON.stringify(mapping || DEFAULT_MAPPING),
+        headersJson: JSON.stringify(["name", "price"]),
+        mappingJson: JSON.stringify(DEFAULT_MAPPING),
         sourceFileName: sourceFileName || null,
       },
     });
@@ -113,24 +93,24 @@ export const getCatalog = async () => {
     prisma.catalogState.findUnique({ where: { id: 1 } }),
   ]);
 
-  const headers = state ? parseJsonSafe(state.headersJson, []) : [];
+  const headers = state
+    ? parseJsonSafe(state.headersJson, ["name", "price"])
+    : ["name", "price"];
   const mapping = state
     ? parseJsonSafe(state.mappingJson, DEFAULT_MAPPING)
     : DEFAULT_MAPPING;
 
-  const items = products.map((product) => {
-    const fields = parseJsonSafe(product.fieldsJson, {});
-    return {
-      id: product.externalId,
+  const items = products.map((product) => ({
+    id: product.id,
+    name: product.name,
+    price: product.price,
+    details: "",
+    type: "General",
+    fields: {
       name: product.name,
-      price: product.price,
-      details: mapping.detailsHeader ? fields[mapping.detailsHeader] || "" : "",
-      type: mapping.typeHeader
-        ? fields[mapping.typeHeader] || "General"
-        : "General",
-      fields,
-    };
-  });
+      price: String(product.price),
+    },
+  }));
 
   return {
     items,
@@ -141,8 +121,9 @@ export const getCatalog = async () => {
 };
 
 export const updateCatalogField = async ({ itemId, header, value }) => {
+  const productId = Number(itemId);
   const [product, state] = await Promise.all([
-    prisma.product.findUnique({ where: { externalId: itemId } }),
+    prisma.product.findUnique({ where: { id: productId } }),
     prisma.catalogState.findUnique({ where: { id: 1 } }),
   ]);
 
@@ -153,13 +134,8 @@ export const updateCatalogField = async ({ itemId, header, value }) => {
   const mapping = state
     ? parseJsonSafe(state.mappingJson, DEFAULT_MAPPING)
     : DEFAULT_MAPPING;
-  const fields = parseJsonSafe(product.fieldsJson, {});
   const nextValue = String(value ?? "");
-  fields[header] = nextValue;
-
-  const nextData = {
-    fieldsJson: JSON.stringify(fields),
-  };
+  const nextData = {};
 
   if (header === mapping.nameHeader) {
     nextData.name = nextValue.trim();
@@ -170,7 +146,7 @@ export const updateCatalogField = async ({ itemId, header, value }) => {
   }
 
   await prisma.product.update({
-    where: { externalId: itemId },
+    where: { id: productId },
     data: nextData,
   });
 

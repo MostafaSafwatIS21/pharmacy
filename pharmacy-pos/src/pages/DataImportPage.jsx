@@ -10,6 +10,68 @@ import {
 import { useCatalogStore } from "../store/useCatalogStore";
 import { parseImportFile } from "../utils/importParsers";
 
+const DEFAULT_MAPPING = {
+  nameHeader: "name",
+  priceHeader: "price",
+  detailsHeader: null,
+  typeHeader: null,
+};
+
+const toPriceNumber = (value) => {
+  const numeric = Number(String(value).replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const mergeItemsByName = (existingItems, importedItems) => {
+  const byName = new Map();
+
+  existingItems.forEach((item, index) => {
+    const name = String(item?.name || "").trim();
+    if (!name) {
+      return;
+    }
+
+    const price = toPriceNumber(item?.price);
+    const existingFields = {
+      ...(item?.fields || {}),
+      name,
+      price: String(price),
+    };
+    byName.set(name.toLowerCase(), {
+      id: item?.id ?? `existing-${index}-${name.toLowerCase()}`,
+      name,
+      price,
+      details: item?.details || existingFields.details || "",
+      type: item?.type || existingFields.type || "General",
+      fields: existingFields,
+    });
+  });
+
+  importedItems.forEach((item, index) => {
+    const name = String(item?.name || "").trim();
+    if (!name) {
+      return;
+    }
+
+    const price = toPriceNumber(item?.price);
+    const importedFields = {
+      ...(item?.fields || {}),
+      name,
+      price: String(price),
+    };
+    byName.set(name.toLowerCase(), {
+      id: item?.id ?? `imported-${index}-${name.toLowerCase()}`,
+      name,
+      price,
+      details: item?.details || importedFields.details || "",
+      type: item?.type || importedFields.type || "General",
+      fields: importedFields,
+    });
+  });
+
+  return Array.from(byName.values());
+};
+
 function DataImportPage() {
   const [isDragActive, setIsDragActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -18,6 +80,7 @@ function DataImportPage() {
   const navigate = useNavigate();
   const setImportedData = useCatalogStore((state) => state.setImportedData);
   const clearDatabase = useCatalogStore((state) => state.clearDatabase);
+  const existingItems = useCatalogStore((state) => state.items);
   const itemsCount = useCatalogStore((state) => state.items.length);
   const sourceFileName = useCatalogStore((state) => state.sourceFileName);
 
@@ -27,8 +90,10 @@ function DataImportPage() {
     });
   }, [setImportedData]);
 
-  const importFile = async (file) => {
-    if (!file) {
+  const importFiles = async (files) => {
+    const fileList = Array.from(files || []).filter(Boolean);
+
+    if (fileList.length === 0) {
       return;
     }
 
@@ -36,24 +101,58 @@ function DataImportPage() {
     setIsLoading(true);
 
     try {
-      const parsedResult = await parseImportFile(file);
+      const importedItems = [];
+      const importedFileNames = [];
+      const mergedHeaders = new Set(["name", "price"]);
+      let skippedFiles = 0;
+      let nextMapping = DEFAULT_MAPPING;
 
-      if (parsedResult.items.length === 0) {
-        setMessage(
-          "No valid rows were found. Check columns like Name and Price.",
-        );
-        setIsLoading(false);
+      for (const file of fileList) {
+        try {
+          const parsedResult = await parseImportFile(file);
+
+          if (parsedResult.items.length === 0) {
+            skippedFiles += 1;
+            continue;
+          }
+
+          importedItems.push(...parsedResult.items);
+          importedFileNames.push(file.name);
+          (parsedResult.headers || []).forEach((header) =>
+            mergedHeaders.add(header),
+          );
+
+          nextMapping = {
+            ...nextMapping,
+            ...(parsedResult.mapping || {}),
+          };
+        } catch {
+          skippedFiles += 1;
+        }
+      }
+
+      if (importedItems.length === 0) {
+        setMessage("No valid rows found. Check Name and Price columns.");
         return;
       }
 
+      const mergedItems = mergeItemsByName(existingItems, importedItems);
+      const mergedCatalog = {
+        items: mergedItems,
+        headers: Array.from(mergedHeaders),
+        mapping: nextMapping,
+      };
+
       await saveImportedCatalog({
-        parsedResult,
-        fileName: file.name,
+        parsedResult: mergedCatalog,
+        fileName: importedFileNames.join(", "),
         setImportedData,
       });
 
       setMessage(
-        `Imported ${parsedResult.items.length} items from ${file.name}`,
+        `Imported ${importedItems.length} items from ${importedFileNames.length} file(s). Total records: ${mergedItems.length}.${
+          skippedFiles > 0 ? ` Skipped ${skippedFiles} invalid file(s).` : ""
+        }`,
       );
       setTimeout(() => navigate("/items"), 500);
     } catch (error) {
@@ -67,8 +166,7 @@ function DataImportPage() {
     event.preventDefault();
     setIsDragActive(false);
 
-    const file = event.dataTransfer.files?.[0];
-    importFile(file);
+    importFiles(event.dataTransfer.files);
   };
 
   return (
@@ -76,7 +174,8 @@ function DataImportPage() {
       <div>
         <h2 className="font-display text-2xl text-slate-900">Data Import</h2>
         <p className="mt-1 text-slate-600">
-          Upload one Excel or CSV file to populate your items directory.
+          Upload one or multiple Excel/CSV files to append items into your
+          directory.
         </p>
       </div>
 
@@ -99,10 +198,10 @@ function DataImportPage() {
       >
         <UploadCloud className="mx-auto mb-4 text-slate-700" size={44} />
         <p className="text-lg font-semibold text-slate-900">
-          Drop your file here or click to upload
+          Drop your file(s) here or click to upload
         </p>
         <p className="mt-2 text-sm text-slate-600">
-          Supported formats: .xlsx, .xls, .csv
+          Supported formats: .xlsx, .xls, .csv (single or multiple files)
         </p>
       </div>
 
@@ -110,15 +209,16 @@ function DataImportPage() {
         ref={fileInputRef}
         type="file"
         className="hidden"
+        multiple
         accept=".xlsx,.xls,.csv"
-        onChange={(event) => importFile(event.target.files?.[0])}
+        onChange={(event) => importFiles(event.target.files)}
       />
 
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
         <div className="flex items-center gap-2">
           <FileUp size={18} className="text-slate-500" />
           <span className="font-medium">Required columns:</span>
-          <span>Name and Price (other columns are optional and supported)</span>
+          <span>Name and Price (extra columns are optional)</span>
         </div>
       </div>
 
@@ -150,7 +250,7 @@ function DataImportPage() {
 
       {isLoading && (
         <p className="text-sm font-semibold text-sky-700">
-          Importing and parsing your file...
+          Importing and merging your file(s)...
         </p>
       )}
       {message && (

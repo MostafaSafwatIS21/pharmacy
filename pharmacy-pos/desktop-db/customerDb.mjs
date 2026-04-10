@@ -46,3 +46,38 @@ export const listCustomers = async ({ search = "" } = {}) => {
     orderBy: { id: "asc" },
   });
 };
+
+export const updateCustomer = async ({ id, name, location, phoneNumber }) => {
+  const customerId = Number(id);
+  if (!Number.isFinite(customerId)) {
+    throw new Error("Customer id is required.");
+  }
+
+  const normalizedName = String(name || "").trim();
+  const normalizedLocation = String(location || "").trim();
+  const normalizedPhone = String(phoneNumber || "").trim();
+
+  if (!normalizedName || !normalizedLocation || !normalizedPhone) {
+    throw new Error("Customer requires name, location, and phone number.");
+  }
+
+  return prisma.customer.update({
+    where: { id: customerId },
+    data: {
+      name: normalizedName,
+      location: normalizedLocation,
+      phoneNumber: normalizedPhone,
+    },
+  });
+};
+
+export const deleteCustomer = async ({ id }) => {
+  const customerId = Number(id);
+  if (!Number.isFinite(customerId)) {
+    throw new Error("Customer id is required.");
+  }
+
+  return prisma.customer.delete({
+    where: { id: customerId },
+  });
+};

@@ -1,18 +1,74 @@
 import path from "node:path";
+import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, ipcMain } from "electron";
-import { addCustomer, listCustomers } from "../desktop-db/customerDb.mjs";
-import { listInvoices, saveInvoice } from "../desktop-db/invoiceDb.mjs";
-import {
-  clearCatalog,
-  getCatalog,
-  replaceCatalog,
-  updateCatalogField,
-} from "../desktop-db/productDb.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const isDev = !app.isPackaged;
+
+let dbApi;
+
+const loadDbApi = async () => {
+  if (dbApi) {
+    return dbApi;
+  }
+
+  const prismaFolder = path.join(app.getPath("userData"), "prisma");
+  mkdirSync(prismaFolder, { recursive: true });
+
+  const dbFilePath = path.join(prismaFolder, "pharmacy.db");
+  process.env.PHARMACY_DB_URL = `file:${dbFilePath.replace(/\\/g, "/")}`;
+
+  const productDb = await import("../desktop-db/productDb.mjs");
+  const customerDb = await import("../desktop-db/customerDb.mjs");
+  const invoiceDb = await import("../desktop-db/invoiceDb.mjs");
+  const { ensureDesktopSchema } =
+    await import("../desktop-db/prismaClient.mjs");
+
+  await ensureDesktopSchema();
+
+  dbApi = {
+    productDb,
+    customerDb,
+    invoiceDb,
+  };
+
+  return dbApi;
+};
+
+const registerIpcHandlers = async () => {
+  const { productDb, customerDb, invoiceDb } = await loadDbApi();
+
+  ipcMain.handle("catalog:replace", async (_event, payload) =>
+    productDb.replaceCatalog(payload),
+  );
+  ipcMain.handle("catalog:get", async () => productDb.getCatalog());
+  ipcMain.handle("catalog:clear", async () => productDb.clearCatalog());
+  ipcMain.handle("catalog:updateField", async (_event, payload) =>
+    productDb.updateCatalogField(payload),
+  );
+
+  ipcMain.handle("customer:add", async (_event, payload) =>
+    customerDb.addCustomer(payload),
+  );
+  ipcMain.handle("customer:list", async (_event, payload) =>
+    customerDb.listCustomers(payload || {}),
+  );
+  ipcMain.handle("customer:update", async (_event, payload) =>
+    customerDb.updateCustomer(payload),
+  );
+  ipcMain.handle("customer:delete", async (_event, payload) =>
+    customerDb.deleteCustomer(payload),
+  );
+
+  ipcMain.handle("invoice:save", async (_event, payload) =>
+    invoiceDb.saveInvoice(payload),
+  );
+  ipcMain.handle("invoice:list", async (_event, payload) =>
+    invoiceDb.listInvoices(payload || {}),
+  );
+};
 
 const createWindow = async () => {
   const mainWindow = new BrowserWindow({
@@ -38,26 +94,8 @@ const createWindow = async () => {
   }
 };
 
-ipcMain.handle("catalog:replace", async (_event, payload) =>
-  replaceCatalog(payload),
-);
-ipcMain.handle("catalog:get", async () => getCatalog());
-ipcMain.handle("catalog:clear", async () => clearCatalog());
-ipcMain.handle("catalog:updateField", async (_event, payload) =>
-  updateCatalogField(payload),
-);
-
-ipcMain.handle("customer:add", async (_event, payload) => addCustomer(payload));
-ipcMain.handle("customer:list", async (_event, payload) =>
-  listCustomers(payload || {}),
-);
-
-ipcMain.handle("invoice:save", async (_event, payload) => saveInvoice(payload));
-ipcMain.handle("invoice:list", async (_event, payload) =>
-  listInvoices(payload || {}),
-);
-
 app.whenReady().then(async () => {
+  await registerIpcHandlers();
   await createWindow();
 
   app.on("activate", () => {

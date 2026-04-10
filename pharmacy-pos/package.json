@@ -9,6 +9,7 @@
     "dev:desktop": "concurrently -k \"npm:dev\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build",
     "build:desktop": "npm run build",
+    "dist:win": "npm run build && electron-builder --win nsis portable",
     "lint": "eslint .",
     "preview": "vite preview",
     "db:generate": "prisma generate",
@@ -16,6 +17,26 @@
     "db:studio": "prisma studio",
     "db:seed": "node scripts/db-seed.mjs",
     "db:cli": "node scripts/db-cli.mjs"
+  },
+  "build": {
+    "appId": "com.pharmacy.pos.desktop",
+    "productName": "Pharmacy POS",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "desktop-db/**/*",
+      "prisma/schema.prisma",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",
@@ -42,6 +63,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
     "prisma": "^6.15.0",
+    "electron-builder": "^26.0.12",
     "vite": "^8.0.4",
     "wait-on": "^9.0.4"
   }

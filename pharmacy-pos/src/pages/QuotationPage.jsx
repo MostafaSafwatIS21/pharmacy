@@ -1,7 +1,8 @@
 import { Printer, ReceiptText } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
 import { Link } from "react-router-dom";
+import { addCustomer, listCustomers } from "../services/customerDataSource";
 import { useCatalogStore } from "../store/useCatalogStore";
 
 const formatCurrency = (value) => `$${value.toFixed(2)}`;
@@ -11,16 +12,28 @@ function QuotationPage() {
   const selectedItemIds = useCatalogStore((state) => state.selectedItemIds);
   const [representative, setRepresentative] = useState("مندوب");
   const [customerName, setCustomerName] = useState("Customer Name");
+  const [customers, setCustomers] = useState([]);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [customerForm, setCustomerForm] = useState({
+    name: "",
+    location: "",
+    phoneNumber: "",
+  });
+  const [customerMessage, setCustomerMessage] = useState("");
   const [taxRate, setTaxRate] = useState(14);
   const [showRowNumber, setShowRowNumber] = useState(true);
-  const [showDetails, setShowDetails] = useState(true);
-  const [showCategory, setShowCategory] = useState(true);
   const [showPrice, setShowPrice] = useState(true);
+  const [showTaxAmount, setShowTaxAmount] = useState(true);
   const [showPriceAfterTax, setShowPriceAfterTax] = useState(true);
   const printRef = useRef(null);
 
-  const selectedItems = items.filter((item) =>
-    selectedItemIds.includes(item.id),
+  const selectedIdSet = useMemo(
+    () => new Set(selectedItemIds),
+    [selectedItemIds],
+  );
+  const selectedItems = useMemo(
+    () => items.filter((item) => selectedIdSet.has(item.id)),
+    [items, selectedIdSet],
   );
   const safeTaxRate = Math.min(100, Math.max(0, Number(taxRate) || 0));
   const selectedItemsWithTax = useMemo(
@@ -45,6 +58,29 @@ function QuotationPage() {
     [selectedItemsWithTax],
   );
   const totalAfterTax = subtotal + totalTax;
+
+  useEffect(() => {
+    listCustomers()
+      .then((result) => setCustomers(result))
+      .catch(() => setCustomerMessage("Failed to load customers."));
+  }, []);
+
+  const submitNewCustomer = async (event) => {
+    event.preventDefault();
+    setCustomerMessage("");
+
+    try {
+      const created = await addCustomer(customerForm);
+      const updated = await listCustomers();
+      setCustomers(updated);
+      setCustomerName(created.name);
+      setCustomerForm({ name: "", location: "", phoneNumber: "" });
+      setShowAddCustomer(false);
+      setCustomerMessage("Customer added and selected.");
+    } catch (error) {
+      setCustomerMessage(error.message || "Failed to add customer.");
+    }
+  };
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -81,7 +117,8 @@ function QuotationPage() {
               Quotation Generator
             </h2>
             <p className="mt-1 text-slate-600">
-              Print selected products with details and representative info.
+              Print selected products using name, price, and price tax
+              additions.
             </p>
           </div>
           <div className="flex gap-2">
@@ -105,11 +142,18 @@ function QuotationPage() {
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <label className="space-y-1 text-sm">
             <span className="font-medium text-slate-700">Customer</span>
-            <input
+            <select
               value={customerName}
               onChange={(event) => setCustomerName(event.target.value)}
               className="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-slate-700"
-            />
+            >
+              <option value="Customer Name">Customer Name</option>
+              {customers.map((customer) => (
+                <option key={customer.id} value={customer.name}>
+                  {customer.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="space-y-1 text-sm">
             <span className="font-medium text-slate-700">
@@ -135,6 +179,72 @@ function QuotationPage() {
           </label>
         </div>
 
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setShowAddCustomer((current) => !current)}
+            className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+          >
+            {showAddCustomer ? "Hide Add Customer" : "Add New Customer"}
+          </button>
+        </div>
+
+        {showAddCustomer && (
+          <form
+            onSubmit={submitNewCustomer}
+            className="mt-3 grid gap-3 rounded-xl border border-slate-300 p-3 sm:grid-cols-4"
+          >
+            <input
+              value={customerForm.name}
+              onChange={(event) =>
+                setCustomerForm((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
+              placeholder="Name"
+              required
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-700"
+            />
+            <input
+              value={customerForm.location}
+              onChange={(event) =>
+                setCustomerForm((current) => ({
+                  ...current,
+                  location: event.target.value,
+                }))
+              }
+              placeholder="Location"
+              required
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-700"
+            />
+            <input
+              value={customerForm.phoneNumber}
+              onChange={(event) =>
+                setCustomerForm((current) => ({
+                  ...current,
+                  phoneNumber: event.target.value,
+                }))
+              }
+              placeholder="Phone Number"
+              required
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-700"
+            />
+            <button
+              type="submit"
+              className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
+            >
+              Save Customer
+            </button>
+          </form>
+        )}
+
+        {customerMessage && (
+          <p className="mt-2 text-sm font-medium text-slate-700">
+            {customerMessage}
+          </p>
+        )}
+
         <div className="mt-3 grid gap-2 rounded-xl border border-slate-300 p-3 text-sm sm:grid-cols-3">
           <label className="flex items-center gap-2 text-slate-700">
             <input
@@ -148,29 +258,20 @@ function QuotationPage() {
           <label className="flex items-center gap-2 text-slate-700">
             <input
               type="checkbox"
-              checked={showDetails}
-              onChange={(event) => setShowDetails(event.target.checked)}
-              className="h-4 w-4"
-            />
-            Details
-          </label>
-          <label className="flex items-center gap-2 text-slate-700">
-            <input
-              type="checkbox"
-              checked={showCategory}
-              onChange={(event) => setShowCategory(event.target.checked)}
-              className="h-4 w-4"
-            />
-            Category
-          </label>
-          <label className="flex items-center gap-2 text-slate-700">
-            <input
-              type="checkbox"
               checked={showPrice}
               onChange={(event) => setShowPrice(event.target.checked)}
               className="h-4 w-4"
             />
             Product price
+          </label>
+          <label className="flex items-center gap-2 text-slate-700">
+            <input
+              type="checkbox"
+              checked={showTaxAmount}
+              onChange={(event) => setShowTaxAmount(event.target.checked)}
+              className="h-4 w-4"
+            />
+            Tax amount
           </label>
           <label className="flex items-center gap-2 text-slate-700">
             <input
@@ -220,9 +321,8 @@ function QuotationPage() {
             <tr className="border-y border-slate-300 text-slate-700">
               {showRowNumber && <th className="px-2 py-2">#</th>}
               <th className="px-2 py-2">Product</th>
-              {showDetails && <th className="px-2 py-2">Details</th>}
-              {showCategory && <th className="px-2 py-2">Category</th>}
               {showPrice && <th className="px-2 py-2">Price</th>}
+              {showTaxAmount && <th className="px-2 py-2">Tax Amount</th>}
               {showPriceAfterTax && (
                 <th className="px-2 py-2">Price After Tax</th>
               )}
@@ -237,17 +337,14 @@ function QuotationPage() {
                 <td className="px-2 py-2 font-semibold text-slate-900">
                   {item.name}
                 </td>
-                {showDetails && (
-                  <td className="px-2 py-2 text-slate-700">
-                    {item.details || "-"}
-                  </td>
-                )}
-                {showCategory && (
-                  <td className="px-2 py-2 text-slate-700">{item.type}</td>
-                )}
                 {showPrice && (
                   <td className="px-2 py-2 font-semibold text-slate-900">
                     {formatCurrency(item.price)}
+                  </td>
+                )}
+                {showTaxAmount && (
+                  <td className="px-2 py-2 font-semibold text-slate-900">
+                    {formatCurrency(item.taxAmount)}
                   </td>
                 )}
                 {showPriceAfterTax && (

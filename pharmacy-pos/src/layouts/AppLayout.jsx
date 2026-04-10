@@ -1,5 +1,6 @@
 import {
   ClipboardList,
+  ContactRound,
   FileSpreadsheet,
   ReceiptText,
   ShoppingCart,
@@ -10,6 +11,7 @@ import { useCatalogStore } from "../store/useCatalogStore";
 const navItems = [
   { to: "/import", label: "Data Import", icon: FileSpreadsheet },
   { to: "/items", label: "Items Directory", icon: ClipboardList },
+  { to: "/customers", label: "Customers", icon: ContactRound },
   { to: "/quotation", label: "Quotation", icon: ReceiptText },
   { to: "/pos", label: "POS Invoice", icon: ShoppingCart },
 ];

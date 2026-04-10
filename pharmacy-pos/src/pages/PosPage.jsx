@@ -1,7 +1,8 @@
 import { Printer, ReceiptText } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
 import { Link } from "react-router-dom";
+import { addCustomer, listCustomers } from "../services/customerDataSource";
 import { useCatalogStore } from "../store/useCatalogStore";
 
 const formatCurrency = (value) => `$${value.toFixed(2)}`;
@@ -11,18 +12,30 @@ function PosPage() {
   const selectedItemIds = useCatalogStore((state) => state.selectedItemIds);
   const [customerName, setCustomerName] = useState("Walk-in Customer");
   const [cashierName, setCashierName] = useState("Main Cashier");
+  const [customers, setCustomers] = useState([]);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [customerForm, setCustomerForm] = useState({
+    name: "",
+    location: "",
+    phoneNumber: "",
+  });
+  const [customerMessage, setCustomerMessage] = useState("");
   const [taxRate, setTaxRate] = useState(14);
-  const [showDetails, setShowDetails] = useState(true);
-  const [showType, setShowType] = useState(true);
   const [showQuantity, setShowQuantity] = useState(true);
   const [showLineTotal, setShowLineTotal] = useState(true);
+  const [showTaxAmount, setShowTaxAmount] = useState(true);
   const [showPriceAfterTax, setShowPriceAfterTax] = useState(true);
   const [quantityById, setQuantityById] = useState({});
   const [selectedRowId, setSelectedRowId] = useState("");
   const invoiceRef = useRef(null);
 
-  const selectedItems = items.filter((item) =>
-    selectedItemIds.includes(item.id),
+  const selectedIdSet = useMemo(
+    () => new Set(selectedItemIds),
+    [selectedItemIds],
+  );
+  const selectedItems = useMemo(
+    () => items.filter((item) => selectedIdSet.has(item.id)),
+    [items, selectedIdSet],
   );
   const safeTaxRate = Math.min(100, Math.max(0, Number(taxRate) || 0));
 
@@ -31,13 +44,13 @@ function PosPage() {
       selectedItems.map((item) => {
         const quantity = Math.max(1, Number(quantityById[item.id] || 1));
         const lineTotal = item.price * quantity;
-        const lineTax = lineTotal * (safeTaxRate / 100);
+        const taxAmount = lineTotal * (safeTaxRate / 100);
         return {
           ...item,
           quantity,
           lineTotal,
-          lineTax,
-          totalAfterTax: lineTotal + lineTax,
+          taxAmount,
+          totalAfterTax: lineTotal + taxAmount,
         };
       }),
     [quantityById, selectedItems, safeTaxRate],
@@ -58,6 +71,29 @@ function PosPage() {
 
   const selectedRowName =
     lineItems.find((item) => item.id === selectedRowId)?.name || "None";
+
+  useEffect(() => {
+    listCustomers()
+      .then((result) => setCustomers(result))
+      .catch(() => setCustomerMessage("Failed to load customers."));
+  }, []);
+
+  const submitNewCustomer = async (event) => {
+    event.preventDefault();
+    setCustomerMessage("");
+
+    try {
+      const created = await addCustomer(customerForm);
+      const updated = await listCustomers();
+      setCustomers(updated);
+      setCustomerName(created.name);
+      setCustomerForm({ name: "", location: "", phoneNumber: "" });
+      setShowAddCustomer(false);
+      setCustomerMessage("Customer added and selected.");
+    } catch (error) {
+      setCustomerMessage(error.message || "Failed to add customer.");
+    }
+  };
 
   const today = new Date();
 
@@ -89,7 +125,7 @@ function PosPage() {
               POS & Sales Invoice
             </h2>
             <p className="mt-1 text-slate-600">
-              All selected items and details are ready in print layout B.
+              Invoice uses name and price with tax-based price calculations.
             </p>
           </div>
           <div className="flex gap-2">
@@ -113,11 +149,18 @@ function PosPage() {
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <label className="space-y-1 text-sm">
             <span className="font-medium text-slate-700">Customer Name</span>
-            <input
+            <select
               value={customerName}
               onChange={(event) => setCustomerName(event.target.value)}
               className="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-slate-700"
-            />
+            >
+              <option value="Walk-in Customer">Walk-in Customer</option>
+              {customers.map((customer) => (
+                <option key={customer.id} value={customer.name}>
+                  {customer.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="space-y-1 text-sm">
             <span className="font-medium text-slate-700">Cashier Name</span>
@@ -141,25 +184,73 @@ function PosPage() {
           </label>
         </div>
 
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setShowAddCustomer((current) => !current)}
+            className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+          >
+            {showAddCustomer ? "Hide Add Customer" : "Add New Customer"}
+          </button>
+        </div>
+
+        {showAddCustomer && (
+          <form
+            onSubmit={submitNewCustomer}
+            className="mt-3 grid gap-3 rounded-xl border border-slate-300 p-3 sm:grid-cols-4"
+          >
+            <input
+              value={customerForm.name}
+              onChange={(event) =>
+                setCustomerForm((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
+              placeholder="Name"
+              required
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-700"
+            />
+            <input
+              value={customerForm.location}
+              onChange={(event) =>
+                setCustomerForm((current) => ({
+                  ...current,
+                  location: event.target.value,
+                }))
+              }
+              placeholder="Location"
+              required
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-700"
+            />
+            <input
+              value={customerForm.phoneNumber}
+              onChange={(event) =>
+                setCustomerForm((current) => ({
+                  ...current,
+                  phoneNumber: event.target.value,
+                }))
+              }
+              placeholder="Phone Number"
+              required
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-700"
+            />
+            <button
+              type="submit"
+              className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
+            >
+              Save Customer
+            </button>
+          </form>
+        )}
+
+        {customerMessage && (
+          <p className="mt-2 text-sm font-medium text-slate-700">
+            {customerMessage}
+          </p>
+        )}
+
         <div className="mt-3 grid gap-2 rounded-xl border border-slate-300 p-3 text-sm sm:grid-cols-3">
-          <label className="flex items-center gap-2 text-slate-700">
-            <input
-              type="checkbox"
-              checked={showDetails}
-              onChange={(event) => setShowDetails(event.target.checked)}
-              className="h-4 w-4"
-            />
-            Details
-          </label>
-          <label className="flex items-center gap-2 text-slate-700">
-            <input
-              type="checkbox"
-              checked={showType}
-              onChange={(event) => setShowType(event.target.checked)}
-              className="h-4 w-4"
-            />
-            Type
-          </label>
           <label className="flex items-center gap-2 text-slate-700">
             <input
               type="checkbox"
@@ -181,6 +272,15 @@ function PosPage() {
           <label className="flex items-center gap-2 text-slate-700">
             <input
               type="checkbox"
+              checked={showTaxAmount}
+              onChange={(event) => setShowTaxAmount(event.target.checked)}
+              className="h-4 w-4"
+            />
+            Tax amount
+          </label>
+          <label className="flex items-center gap-2 text-slate-700">
+            <input
+              type="checkbox"
               checked={showPriceAfterTax}
               onChange={(event) => setShowPriceAfterTax(event.target.checked)}
               className="h-4 w-4"
@@ -191,16 +291,15 @@ function PosPage() {
       </div>
 
       <div className="screen-only overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <div className="max-h-[420px] overflow-auto">
-          <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+        <div className="max-h-105 overflow-auto">
+          <table className="w-full min-w-245 border-collapse text-left text-sm">
             <thead className="sticky top-0 bg-slate-100">
               <tr>
                 <th className="px-4 py-3">Item</th>
-                {showDetails && <th className="px-4 py-3">Details</th>}
-                {showType && <th className="px-4 py-3">Type</th>}
                 <th className="px-4 py-3">Unit Price</th>
                 {showQuantity && <th className="px-4 py-3">Qty</th>}
                 {showLineTotal && <th className="px-4 py-3">Line Total</th>}
+                {showTaxAmount && <th className="px-4 py-3">Tax Amount</th>}
                 {showPriceAfterTax && (
                   <th className="px-4 py-3">Total After Tax</th>
                 )}
@@ -220,14 +319,6 @@ function PosPage() {
                   <td className="px-4 py-3 font-semibold text-slate-900">
                     {item.name}
                   </td>
-                  {showDetails && (
-                    <td className="px-4 py-3 text-slate-700">
-                      {item.details || "-"}
-                    </td>
-                  )}
-                  {showType && (
-                    <td className="px-4 py-3 text-slate-700">{item.type}</td>
-                  )}
                   <td className="px-4 py-3 text-slate-700">
                     {formatCurrency(item.price)}
                   </td>
@@ -254,6 +345,11 @@ function PosPage() {
                   {showLineTotal && (
                     <td className="px-4 py-3 font-semibold text-slate-900">
                       {formatCurrency(item.lineTotal)}
+                    </td>
+                  )}
+                  {showTaxAmount && (
+                    <td className="px-4 py-3 font-semibold text-slate-900">
+                      {formatCurrency(item.taxAmount)}
                     </td>
                   )}
                   {showPriceAfterTax && (
@@ -325,11 +421,10 @@ function PosPage() {
           <thead>
             <tr className="border-y border-slate-300 text-slate-700">
               <th className="px-2 py-2">Item</th>
-              {showDetails && <th className="px-2 py-2">Details</th>}
-              {showType && <th className="px-2 py-2">Type</th>}
               <th className="px-2 py-2">Unit</th>
               {showQuantity && <th className="px-2 py-2">Qty</th>}
               {showLineTotal && <th className="px-2 py-2">Total</th>}
+              {showTaxAmount && <th className="px-2 py-2">Tax</th>}
               {showPriceAfterTax && (
                 <th className="px-2 py-2">Total After Tax</th>
               )}
@@ -349,14 +444,6 @@ function PosPage() {
                 <td className="px-2 py-2 font-semibold text-slate-900">
                   {item.name}
                 </td>
-                {showDetails && (
-                  <td className="px-2 py-2 text-slate-700">
-                    {item.details || "-"}
-                  </td>
-                )}
-                {showType && (
-                  <td className="px-2 py-2 text-slate-700">{item.type}</td>
-                )}
                 <td className="px-2 py-2 text-slate-700">
                   {formatCurrency(item.price)}
                 </td>
@@ -366,6 +453,11 @@ function PosPage() {
                 {showLineTotal && (
                   <td className="px-2 py-2 font-semibold text-slate-900">
                     {formatCurrency(item.lineTotal)}
+                  </td>
+                )}
+                {showTaxAmount && (
+                  <td className="px-2 py-2 font-semibold text-slate-900">
+                    {formatCurrency(item.taxAmount)}
                   </td>
                 )}
                 {showPriceAfterTax && (
