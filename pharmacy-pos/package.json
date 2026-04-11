@@ -9,7 +9,7 @@
     "dev:desktop": "concurrently -k \"npm:dev\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build",
     "build:desktop": "npm run build",
-    "dist:win": "npm run build && electron-builder --win nsis portable",
+    "dist:win": "npm run build && npm run db:generate && electron-builder --win nsis portable",
     "postinstall": "prisma generate",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -34,10 +34,22 @@
       "dist/**/*",
       "electron/**/*",
       "desktop-db/**/*",
-      "node_modules/@prisma/**/*",
-      "node_modules/.prisma/**/*",
       "prisma/schema.prisma",
-      "package.json"
+      "package.json",
+      {
+        "from": "node_modules/@prisma/client",
+        "to": "node_modules/@prisma/client",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "node_modules/.prisma/client",
+        "to": "node_modules/.prisma/client",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "win": {
       "signAndEditExecutable": false,
