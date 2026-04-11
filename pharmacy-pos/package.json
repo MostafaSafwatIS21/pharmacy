@@ -34,6 +34,8 @@
       "dist/**/*",
       "electron/**/*",
       "desktop-db/**/*",
+      "node_modules/@prisma/**/*",
+      "node_modules/.prisma/**/*",
       "prisma/schema.prisma",
       "package.json"
     ],
