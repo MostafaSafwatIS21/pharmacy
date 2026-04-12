@@ -53,6 +53,7 @@
     ],
     "win": {
       "signAndEditExecutable": false,
+      "icon": "public/icon.png",
       "target": [
         "nsis",
         "portable"

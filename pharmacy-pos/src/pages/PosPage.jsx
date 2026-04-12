@@ -1,16 +1,15 @@
-import { Printer, ReceiptText } from "lucide-react";
+import { Printer } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
 import { Link } from "react-router-dom";
+import DocumentHeader from "../components/DocumentHeader";
 import { addCustomer, listCustomers } from "../services/customerDataSource";
 import { saveInvoiceLines } from "../services/invoiceDataSource";
 import { useCatalogStore } from "../store/useCatalogStore";
-
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("ar-EG", {
-    style: "currency",
-    currency: "EGP",
-  }).format(Number(value || 0));
+import {
+  formatCurrency,
+  numberToArabicCurrencyText,
+} from "../utils/arabicCurrency";
 
 function PosPage() {
   const items = useCatalogStore((state) => state.items);
@@ -35,6 +34,7 @@ function PosPage() {
   const [invoicePriceById, setInvoicePriceById] = useState({});
   const [quantityById, setQuantityById] = useState({});
   const [selectedRowId, setSelectedRowId] = useState("");
+  const [savedInvoiceNumber, setSavedInvoiceNumber] = useState("");
   const [lastSavedCartFingerprint, setLastSavedCartFingerprint] = useState("");
   const invoiceRef = useRef(null);
 
@@ -73,15 +73,23 @@ function PosPage() {
   const subtotal = lineItems.reduce((sum, item) => sum + item.lineTotal, 0);
   const tax = subtotal * (safeTaxRate / 100);
   const grandTotal = subtotal + tax;
+  const grandTotalInArabic = useMemo(
+    () => numberToArabicCurrencyText(grandTotal),
+    [grandTotal],
+  );
   const cartFingerprint = useMemo(
     () =>
-      JSON.stringify(
-        lineItems.map((item) => ({
+      JSON.stringify({
+        customerName: String(customerName || "")
+          .trim()
+          .toLowerCase(),
+        items: lineItems.map((item) => ({
           id: item.id,
           qty: item.quantity,
+          price: Number(item.price || 0),
         })),
-      ),
-    [lineItems],
+      }),
+    [customerName, lineItems],
   );
   const canSaveInvoice = cartFingerprint !== lastSavedCartFingerprint;
 
@@ -96,6 +104,12 @@ function PosPage() {
 
   const selectedRowName =
     lineItems.find((item) => item.id === selectedRowId)?.name || "لا يوجد";
+  const selectedCustomer = useMemo(
+    () => customers.find((customer) => customer.name === customerName) || null,
+    [customers, customerName],
+  );
+  const customerPhoneNumber = selectedCustomer?.phoneNumber || "-";
+  const customerLocation = selectedCustomer?.location || "-";
 
   useEffect(() => {
     listCustomers()
@@ -127,7 +141,7 @@ function PosPage() {
 
     if (!canSaveInvoice) {
       setInvoiceMessage(
-        "لا يمكن حفظ نفس الفاتورة مرة أخرى. أضف صنفًا جديدًا أولًا.",
+        "لا يمكن حفظ نفس الفاتورة مرة أخرى. غيّر العميل أو عدّل الأصناف أولًا.",
       );
       return;
     }
@@ -142,10 +156,11 @@ function PosPage() {
       });
       if (result.duplicatePrevented) {
         setInvoiceMessage(
-          "لا يمكن حفظ نفس الفاتورة مرة أخرى. أضف صنفًا جديدًا أولًا.",
+          "لا يمكن حفظ نفس الفاتورة مرة أخرى. غيّر العميل أو عدّل الأصناف أولًا.",
         );
       } else {
         setLastSavedCartFingerprint(cartFingerprint);
+        setSavedInvoiceNumber(result.invoiceNumber || "");
         setInvoiceMessage(
           `تم حفظ الفاتورة ${result.invoiceNumber} بعدد ${result.rowsSaved} صنف.`,
         );
@@ -370,7 +385,7 @@ function PosPage() {
       <div className="screen-only overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="max-h-105 overflow-auto">
           <table className="w-full min-w-245 border-collapse text-left text-sm">
-            <thead className="sticky top-0 bg-slate-100">
+            <thead className="sticky top-0 bg-slate-800 text-white">
               <tr>
                 <th className="px-4 py-3">الصنف</th>
                 <th className="px-4 py-3">سعر الوحدة</th>
@@ -467,8 +482,8 @@ function PosPage() {
             <span>الضريبة ({safeTaxRate}%)</span>
             <span>{formatCurrency(tax)}</span>
           </div>
-          <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-base font-semibold text-slate-900">
-            <span>الإجمالي النهائي</span>
+          <div className="flex items-center justify-between rounded-lg bg-slate-800 px-3 py-2 text-base font-semibold text-white">
+            <span>إجمالي السعر</span>
             <span>{formatCurrency(grandTotal)}</span>
           </div>
         </div>
@@ -479,40 +494,52 @@ function PosPage() {
 
       <article
         ref={invoiceRef}
-        className="a4-sheet rounded-2xl border border-slate-300 bg-white p-6 print:border-none print:p-0"
+        dir="rtl"
+        className="a4-sheet rounded-2xl border border-slate-300 bg-white p-6 text-right print:border-none print:p-0"
       >
-        <div className="mb-5 flex items-start justify-between border-b border-slate-200 pb-4">
-          <div>
-            <h3 className="font-display text-2xl text-slate-900">
-              فاتورة بيع صيدلية
-            </h3>
-            <p className="text-sm text-slate-600">تنسيق الطباعة</p>
+        <DocumentHeader title="فاتورة مبيعات | SALES INVOICE" />
+
+        <div className="mb-4 grid gap-4 text-sm text-slate-700 sm:grid-cols-2">
+          <div className="space-y-1 text-right">
+            <p>
+              <span className="font-semibold text-slate-900">اسم العميل:</span>{" "}
+              {customerName || "عميل نقدي"}
+            </p>
+            <p>
+              <span className="font-semibold text-slate-900">الهاتف:</span>{" "}
+              {customerPhoneNumber}
+            </p>
+            <p>
+              <span className="font-semibold text-slate-900">
+                عنوان العميل:
+              </span>{" "}
+              {customerLocation}
+            </p>
           </div>
-          <ReceiptText size={32} className="text-slate-400" />
+          <div className="space-y-1 text-right">
+            <p>
+              <span className="font-semibold text-slate-900">
+                رقم الفاتورة:
+              </span>{" "}
+              {savedInvoiceNumber || "غير محفوظ"}
+            </p>
+            <p>
+              <span className="font-semibold text-slate-900">
+                تاريخ الفاتورة:
+              </span>{" "}
+              {today.toLocaleDateString("ar-EG")}
+            </p>
+            <p>
+              <span className="font-semibold text-slate-900">الكاشير:</span>{" "}
+              {cashierName || "الكاشير الرئيسي"}
+            </p>
+          </div>
         </div>
 
-        <div className="mb-4 grid gap-1 text-sm text-slate-700 sm:grid-cols-2">
-          <p>
-            <span className="font-semibold text-slate-900">التاريخ:</span>{" "}
-            {today.toLocaleDateString("ar-EG")}
-          </p>
-          <p>
-            <span className="font-semibold text-slate-900">الوقت:</span>{" "}
-            {today.toLocaleTimeString("ar-EG")}
-          </p>
-          <p>
-            <span className="font-semibold text-slate-900">العميل:</span>{" "}
-            {customerName || "عميل نقدي"}
-          </p>
-          <p>
-            <span className="font-semibold text-slate-900">الكاشير:</span>{" "}
-            {cashierName || "الكاشير الرئيسي"}
-          </p>
-        </div>
-
-        <table className="mb-4 w-full border-collapse text-left text-sm">
+        <table className="mb-4 w-full border-collapse text-right text-sm">
           <thead>
-            <tr className="border-y border-slate-300 text-slate-700">
+            <tr className="border-y border-slate-800 bg-slate-800 text-white">
+              <th className="px-2 py-2">م</th>
               <th className="px-2 py-2">الصنف</th>
               <th className="px-2 py-2">سعر الوحدة</th>
               {showQuantity && <th className="px-2 py-2">الكمية</th>}
@@ -522,8 +549,14 @@ function PosPage() {
             </tr>
           </thead>
           <tbody>
-            {lineItems.map((item) => (
-              <tr key={item.id} className="border-b border-slate-200">
+            {lineItems.map((item, index) => (
+              <tr
+                key={item.id}
+                className={`border-b border-slate-200 ${index === 0 ? "bg-slate-100" : ""}`}
+              >
+                <td className="px-2 py-2 font-semibold text-slate-700">
+                  {index + 1}
+                </td>
                 <td className="px-2 py-2 font-semibold text-slate-900">
                   {item.name}
                 </td>
@@ -562,11 +595,19 @@ function PosPage() {
             <span>الضريبة ({safeTaxRate}%)</span>
             <span>{formatCurrency(tax)}</span>
           </p>
-          <p className="flex justify-between border-t border-slate-300 pt-2 text-base font-bold text-slate-900">
-            <span>الإجمالي النهائي</span>
+          <p className="flex justify-between rounded-lg bg-slate-800 px-3 py-2 text-base font-bold text-white">
+            <span>إجمالي السعر</span>
             <span>{formatCurrency(grandTotal)}</span>
           </p>
         </div>
+
+        <p className="mt-3 max-w-2xl text-right text-lg font-semibold leading-7 text-slate-700">
+          مبلغ وقدره {grandTotalInArabic}
+        </p>
+
+        <p className="mt-6 text-center text-sm font-medium text-slate-600">
+          ثقتكم نجاحنا
+        </p>
       </article>
     </section>
   );

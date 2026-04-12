@@ -1,5 +1,41 @@
 import { prisma } from "./prismaClient.mjs";
 
+const INVOICE_NUMBER_PREFIX = "INV-";
+const INVOICE_NUMBER_PADDING = 6;
+
+const parseInvoiceSequence = (invoiceNumber) => {
+  const normalized = String(invoiceNumber || "")
+    .trim()
+    .toUpperCase();
+  const match = normalized.match(/^INV-(\d+)$/);
+  if (!match) {
+    return null;
+  }
+
+  const sequence = Number(match[1]);
+  return Number.isFinite(sequence) ? sequence : null;
+};
+
+const formatInvoiceNumber = (sequence) =>
+  `${INVOICE_NUMBER_PREFIX}${String(sequence).padStart(INVOICE_NUMBER_PADDING, "0")}`;
+
+export const getNextInvoiceNumber = async () => {
+  const rows = await prisma.invoice.findMany({
+    select: { invoiceNumber: true },
+  });
+
+  const maxSequence = rows.reduce((max, row) => {
+    const sequence = parseInvoiceSequence(row.invoiceNumber);
+    if (!Number.isFinite(sequence)) {
+      return max;
+    }
+
+    return Math.max(max, sequence);
+  }, 0);
+
+  return formatInvoiceNumber(maxSequence + 1);
+};
+
 export const saveInvoice = async ({
   invoiceNumber,
   productName,

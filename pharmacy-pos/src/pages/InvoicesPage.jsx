@@ -1,9 +1,16 @@
-import { Search, Trash2 } from "lucide-react";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Printer, Search, Trash2 } from "lucide-react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useReactToPrint } from "react-to-print";
+import DocumentHeader from "../components/DocumentHeader";
 import {
   deleteInvoiceGroup,
   listInvoiceLines,
 } from "../services/invoiceDataSource";
+import {
+  deleteQuotationByInvoiceNumber,
+  listQuotationLines,
+} from "../services/quotationDataSource";
+import { numberToArabicCurrencyText } from "../utils/arabicCurrency";
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("ar-EG", {
@@ -19,6 +26,18 @@ function InvoicesPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [deletingInvoiceId, setDeletingInvoiceId] = useState("");
   const [message, setMessage] = useState("");
+  const [approvedInvoiceNumbers, setApprovedInvoiceNumbers] = useState(
+    new Set(),
+  );
+  const [invoiceToPrint, setInvoiceToPrint] = useState(null);
+  const printRef = useRef(null);
+
+  const handlePrintInvoice = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: invoiceToPrint
+      ? `invoice-${invoiceToPrint.invoiceNumber || invoiceToPrint.groupId}`
+      : "invoice",
+  });
 
   const handleDeleteInvoice = async (invoice) => {
     const confirmed = window.confirm("هل أنت متأكد من حذف هذه الفاتورة؟");
@@ -34,9 +53,25 @@ function InvoicesPage() {
         invoiceNumber: invoice.invoiceNumber,
         lineIds: invoice.lines.map((line) => line.id),
       });
-      setMessage(
-        `تم حذف الفاتورة. عدد السطور المحذوفة: ${result.deletedCount}.`,
-      );
+
+      let linkedQuotationDeletedCount = 0;
+      const isFromQuotation = String(invoice.source || "").includes("عرض سعر");
+      if (isFromQuotation && String(invoice.invoiceNumber || "").trim()) {
+        const quotationDelete = await deleteQuotationByInvoiceNumber({
+          invoiceNumber: invoice.invoiceNumber,
+        });
+        linkedQuotationDeletedCount = Number(quotationDelete.deletedCount || 0);
+      }
+
+      if (linkedQuotationDeletedCount > 0) {
+        setMessage(
+          `تم حذف الفاتورة (${result.deletedCount} سطر) وتم حذف عرض السعر المرتبط (${linkedQuotationDeletedCount} سطر).`,
+        );
+      } else {
+        setMessage(
+          `تم حذف الفاتورة. عدد السطور المحذوفة: ${result.deletedCount}.`,
+        );
+      }
       setExpandedInvoiceId((current) =>
         current === invoice.groupId ? "" : current,
       );
@@ -51,13 +86,22 @@ function InvoicesPage() {
   useEffect(() => {
     let active = true;
 
-    listInvoiceLines({
-      search: query,
-      customerName: customerFilter,
-    })
-      .then((result) => {
+    Promise.all([
+      listInvoiceLines({
+        search: query,
+        customerName: customerFilter,
+      }),
+      listQuotationLines({ status: "APPROVED" }),
+    ])
+      .then(([invoiceRows, approvedQuotationRows]) => {
         if (active) {
-          setInvoices(result);
+          setInvoices(invoiceRows);
+          const approvedSet = new Set(
+            approvedQuotationRows
+              .map((row) => String(row.approvedInvoiceNumber || "").trim())
+              .filter(Boolean),
+          );
+          setApprovedInvoiceNumbers(approvedSet);
         }
       })
       .catch((error) => {
@@ -84,14 +128,20 @@ function InvoicesPage() {
       const key = line.invoiceNumber || fallbackKey;
 
       if (!grouped.has(key)) {
+        const normalizedInvoiceNumber = String(line.invoiceNumber || "").trim();
+        const source = approvedInvoiceNumbers.has(normalizedInvoiceNumber)
+          ? "من عرض سعر"
+          : "فاتورة مباشرة";
+
         grouped.set(key, {
           groupId: key,
-          invoiceNumber: String(line.invoiceNumber || "").trim(),
+          invoiceNumber: normalizedInvoiceNumber,
           customerName: line.customerName,
           createdAt: line.createdAt,
           lines: [],
           total: 0,
           itemsCount: 0,
+          source,
         });
       }
 
@@ -105,7 +155,7 @@ function InvoicesPage() {
     return Array.from(grouped.values()).sort(
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
     );
-  }, [invoices]);
+  }, [approvedInvoiceNumbers, invoices]);
 
   const totalAmount = useMemo(
     () => groupedInvoices.reduce((sum, invoice) => sum + invoice.total, 0),
@@ -163,6 +213,7 @@ function InvoicesPage() {
                 <th className="px-4 py-3">التاريخ</th>
                 <th className="px-4 py-3">رقم الفاتورة</th>
                 <th className="px-4 py-3">العميل</th>
+                <th className="px-4 py-3">المصدر</th>
                 <th className="px-4 py-3">عدد الأصناف</th>
                 <th className="px-4 py-3">الإجمالي</th>
                 <th className="px-4 py-3">الإجراءات</th>
@@ -187,6 +238,9 @@ function InvoicesPage() {
                       </td>
                       <td className="px-4 py-3 text-slate-700">
                         {invoice.customerName}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {invoice.source}
                       </td>
                       <td className="px-4 py-3 text-slate-700">
                         {invoice.itemsCount}
@@ -218,6 +272,19 @@ function InvoicesPage() {
                             <Trash2 size={13} />
                             {isDeleting ? "جارٍ الحذف..." : "حذف"}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInvoiceToPrint(invoice);
+                              setTimeout(() => {
+                                handlePrintInvoice();
+                              }, 0);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700"
+                          >
+                            <Printer size={13} />
+                            طباعة
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -226,7 +293,7 @@ function InvoicesPage() {
                         key={`${invoice.groupId}-lines`}
                         className="border-t border-slate-100 bg-slate-50"
                       >
-                        <td colSpan={6} className="px-4 py-3">
+                        <td colSpan={7} className="px-4 py-3">
                           <div className="overflow-auto">
                             <table className="w-full border-collapse text-left text-xs">
                               <thead>
@@ -280,6 +347,89 @@ function InvoicesPage() {
       </p>
       {message && (
         <p className="text-sm font-medium text-slate-800">{message}</p>
+      )}
+
+      {invoiceToPrint && (
+        <article
+          ref={printRef}
+          dir="rtl"
+          className="a4-sheet fixed top-0 rounded-2xl border border-slate-300 bg-white p-6 text-right print:static print:border-none print:p-0"
+          style={{ left: "-9999px" }}
+        >
+          <DocumentHeader title="فاتورة مبيعات | SALES INVOICE" />
+
+          <div className="mb-4 grid gap-1 text-sm text-slate-700 sm:grid-cols-2">
+            <p>
+              <span className="font-semibold text-slate-900">التاريخ:</span>{" "}
+              {new Date(invoiceToPrint.createdAt).toLocaleDateString("ar-EG")}
+            </p>
+            <p>
+              <span className="font-semibold text-slate-900">الوقت:</span>{" "}
+              {new Date(invoiceToPrint.createdAt).toLocaleTimeString("ar-EG")}
+            </p>
+            <p>
+              <span className="font-semibold text-slate-900">العميل:</span>{" "}
+              {invoiceToPrint.customerName || "عميل"}
+            </p>
+            <p>
+              <span className="font-semibold text-slate-900">
+                رقم الفاتورة:
+              </span>{" "}
+              {invoiceToPrint.invoiceNumber || invoiceToPrint.groupId}
+            </p>
+          </div>
+
+          <table className="mb-4 w-full border-collapse text-right text-sm">
+            <thead>
+              <tr className="border-y border-slate-800 bg-slate-800 text-white">
+                <th className="px-2 py-2">م</th>
+                <th className="px-2 py-2">الصنف</th>
+                <th className="px-2 py-2">سعر الوحدة</th>
+                <th className="px-2 py-2">الكمية</th>
+                <th className="px-2 py-2">الإجمالي</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoiceToPrint.lines.map((line, index) => (
+                <tr
+                  key={line.id}
+                  className={`border-b border-slate-200 ${index === 0 ? "bg-slate-100" : ""}`}
+                >
+                  <td className="px-2 py-2 font-semibold text-slate-700">
+                    {index + 1}
+                  </td>
+                  <td className="px-2 py-2 font-semibold text-slate-900">
+                    {line.productName}
+                  </td>
+                  <td className="px-2 py-2 text-slate-700">
+                    {formatCurrency(line.price)}
+                  </td>
+                  <td className="px-2 py-2 text-slate-700">{line.qty}</td>
+                  <td className="px-2 py-2 font-semibold text-slate-900">
+                    {formatCurrency(
+                      Number(line.price || 0) * Number(line.qty || 0),
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="ml-auto max-w-xs space-y-1 text-sm">
+            <p className="flex justify-between rounded-lg bg-slate-800 px-3 py-2 text-base font-bold text-white">
+              <span>إجمالي السعر</span>
+              <span>{formatCurrency(invoiceToPrint.total)}</span>
+            </p>
+          </div>
+
+          <p className="mt-3 max-w-2xl text-right text-sm font-semibold leading-7 text-slate-700">
+            مبلغ وقدره {numberToArabicCurrencyText(invoiceToPrint.total)}
+          </p>
+
+          <p className="mt-6 text-center text-sm font-medium text-slate-600">
+            ثقتكم نجاحنا
+          </p>
+        </article>
       )}
     </section>
   );

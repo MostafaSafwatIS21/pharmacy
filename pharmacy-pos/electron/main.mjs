@@ -28,6 +28,7 @@ const loadDbApi = async () => {
   const productDb = await import("../desktop-db/productDb.mjs");
   const customerDb = await import("../desktop-db/customerDb.mjs");
   const invoiceDb = await import("../desktop-db/invoiceDb.mjs");
+  const quotationDb = await import("../desktop-db/quotationDb.mjs");
   const { ensureDesktopSchema } =
     await import("../desktop-db/prismaClient.mjs");
 
@@ -37,13 +38,14 @@ const loadDbApi = async () => {
     productDb,
     customerDb,
     invoiceDb,
+    quotationDb,
   };
 
   return dbApi;
 };
 
 const registerIpcHandlers = async () => {
-  const { productDb, customerDb, invoiceDb } = await loadDbApi();
+  const { productDb, customerDb, invoiceDb, quotationDb } = await loadDbApi();
 
   ipcMain.handle("catalog:replace", async (_event, payload) =>
     productDb.replaceCatalog(payload),
@@ -79,8 +81,30 @@ const registerIpcHandlers = async () => {
   ipcMain.handle("invoice:list", async (_event, payload) =>
     invoiceDb.listInvoices(payload || {}),
   );
+  ipcMain.handle("invoice:nextNumber", async () =>
+    invoiceDb.getNextInvoiceNumber(),
+  );
   ipcMain.handle("invoice:delete", async (_event, payload) =>
     invoiceDb.deleteInvoice(payload || {}),
+  );
+
+  ipcMain.handle("quotation:nextNumber", async () =>
+    quotationDb.getNextQuoteNumber(),
+  );
+  ipcMain.handle("quotation:save", async (_event, payload) =>
+    quotationDb.saveQuotation(payload || {}),
+  );
+  ipcMain.handle("quotation:list", async (_event, payload) =>
+    quotationDb.listQuotations(payload || {}),
+  );
+  ipcMain.handle("quotation:approve", async (_event, payload) =>
+    quotationDb.approveQuotation(payload || {}),
+  );
+  ipcMain.handle("quotation:delete", async (_event, payload) =>
+    quotationDb.deleteQuotation(payload || {}),
+  );
+  ipcMain.handle("quotation:deleteByInvoice", async (_event, payload) =>
+    quotationDb.deleteQuotationByInvoiceNumber(payload || {}),
   );
 };
 

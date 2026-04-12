@@ -1,4 +1,6 @@
 const STORAGE_KEY = "pharmacy-pos-invoices-v1";
+const INVOICE_NUMBER_PREFIX = "INV-";
+const INVOICE_NUMBER_PADDING = 6;
 
 let saveInFlightPromise = null;
 let lastSavedFingerprint = "";
@@ -34,13 +36,49 @@ const writeLocalInvoices = (invoices) => {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(invoices));
 };
 
-const generateInvoiceNumber = () => {
-  const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `INV-${timestamp}-${random}`;
+const parseInvoiceSequence = (invoiceNumber) => {
+  const normalized = String(invoiceNumber || "")
+    .trim()
+    .toUpperCase();
+  const match = normalized.match(/^INV-(\d+)$/);
+  if (!match) {
+    return null;
+  }
+
+  const sequence = Number(match[1]);
+  return Number.isFinite(sequence) ? sequence : null;
 };
 
-const buildSaveFingerprint = ({ lineItems }) => {
+const formatInvoiceNumber = (sequence) =>
+  `${INVOICE_NUMBER_PREFIX}${String(sequence).padStart(INVOICE_NUMBER_PADDING, "0")}`;
+
+const getNextLocalInvoiceNumber = () => {
+  const maxSequence = readLocalInvoices().reduce((max, invoice) => {
+    const sequence = parseInvoiceSequence(invoice?.invoiceNumber);
+    if (!Number.isFinite(sequence)) {
+      return max;
+    }
+
+    return Math.max(max, sequence);
+  }, 0);
+
+  return formatInvoiceNumber(maxSequence + 1);
+};
+
+const getNextInvoiceNumber = async () => {
+  const bridge = getDesktopBridge();
+
+  if (bridge?.getNextInvoiceNumber) {
+    const invoiceNumber = await bridge.getNextInvoiceNumber();
+    if (String(invoiceNumber || "").trim()) {
+      return invoiceNumber;
+    }
+  }
+
+  return getNextLocalInvoiceNumber();
+};
+
+const buildSaveFingerprint = ({ customerName, lineItems }) => {
   const normalizedItems = (lineItems || []).map((item) => ({
     name: String(item?.name || "")
       .trim()
@@ -50,6 +88,9 @@ const buildSaveFingerprint = ({ lineItems }) => {
   }));
 
   return JSON.stringify({
+    customerName: String(customerName || "")
+      .trim()
+      .toLowerCase(),
     items: normalizedItems,
   });
 };
@@ -59,7 +100,7 @@ export const saveInvoiceLines = async ({ customerName, lineItems }) => {
     return saveInFlightPromise;
   }
 
-  const fingerprint = buildSaveFingerprint({ lineItems });
+  const fingerprint = buildSaveFingerprint({ customerName, lineItems });
   if (lastSavedResult && lastSavedFingerprint === fingerprint) {
     return {
       ...lastSavedResult,
@@ -68,7 +109,7 @@ export const saveInvoiceLines = async ({ customerName, lineItems }) => {
   }
 
   saveInFlightPromise = (async () => {
-    const invoiceNumber = generateInvoiceNumber();
+    const invoiceNumber = await getNextInvoiceNumber();
     const bridge = getDesktopBridge();
 
     if (bridge?.saveInvoice) {

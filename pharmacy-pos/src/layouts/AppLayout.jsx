@@ -31,10 +31,10 @@ function AppLayout() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="font-display text-2xl text-slate-900 sm:text-3xl">
-                نظام الصيدلية للمبيعات وعروض الأسعار
+                الفؤاد للتجهيزات الطبية
               </h1>
               <p className="mt-1 text-sm text-slate-600">
-                استيراد سريع، إدارة منتجات، وفواتير جاهزة للطباعة.
+                نظام إدارة المبيعات والفواتير للطباعة.
               </p>
             </div>
             <div className="flex gap-2 text-xs sm:text-sm">

@@ -17,5 +17,15 @@ contextBridge.exposeInMainWorld("pharmacyDb", {
 
   saveInvoice: (payload) => ipcRenderer.invoke("invoice:save", payload),
   listInvoices: (payload) => ipcRenderer.invoke("invoice:list", payload),
+  getNextInvoiceNumber: () => ipcRenderer.invoke("invoice:nextNumber"),
   deleteInvoice: (payload) => ipcRenderer.invoke("invoice:delete", payload),
+
+  getNextQuoteNumber: () => ipcRenderer.invoke("quotation:nextNumber"),
+  saveQuotation: (payload) => ipcRenderer.invoke("quotation:save", payload),
+  listQuotations: (payload) => ipcRenderer.invoke("quotation:list", payload),
+  approveQuotation: (payload) =>
+    ipcRenderer.invoke("quotation:approve", payload),
+  deleteQuotation: (payload) => ipcRenderer.invoke("quotation:delete", payload),
+  deleteQuotationByInvoice: (payload) =>
+    ipcRenderer.invoke("quotation:deleteByInvoice", payload),
 });

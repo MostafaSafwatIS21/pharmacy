@@ -69,6 +69,25 @@ export const ensureDesktopSchema = async () => {
     )
   `);
 
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Quotation" (
+      "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+      "quoteNumber" TEXT NOT NULL DEFAULT '',
+      "customerName" TEXT NOT NULL,
+      "customerPhone" TEXT NOT NULL DEFAULT '',
+      "customerLocation" TEXT NOT NULL DEFAULT '',
+      "representative" TEXT NOT NULL,
+      "taxRate" REAL NOT NULL DEFAULT 0,
+      "productName" TEXT NOT NULL,
+      "price" REAL NOT NULL,
+      "qty" INTEGER NOT NULL,
+      "status" TEXT NOT NULL DEFAULT 'PENDING',
+      "approvedInvoiceNumber" TEXT NOT NULL DEFAULT '',
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   try {
     await prisma.$executeRawUnsafe(`
       ALTER TABLE "Invoice"
