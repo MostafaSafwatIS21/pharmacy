@@ -7,9 +7,9 @@ function DocumentHeader({ title }) {
             الفؤاد للتجهيزات الطبية
           </h3>
           <p>Al Fouad Medical Supplies & Equipment</p>
-          <p>وراق العرب</p>
+          <p>العنوان: وراق العرب</p>
           <p>الهاتف: 01011099611 - 01006369031</p>
-          <p>Alfouad.medical2026@gmail.com</p>
+          <p>Alfouad.medical2026@gmail.com الايميل: </p>
         </div>
         <img
           src="./invoice_icon.png"

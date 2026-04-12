@@ -20,9 +20,9 @@ const formatInvoiceNumber = (sequence) =>
   `${INVOICE_NUMBER_PREFIX}${String(sequence).padStart(INVOICE_NUMBER_PADDING, "0")}`;
 
 export const getNextInvoiceNumber = async () => {
-  const rows = await prisma.invoice.findMany({
-    select: { invoiceNumber: true },
-  });
+  const rows = await prisma.$queryRawUnsafe(
+    `SELECT "invoiceNumber" FROM "Invoice" WHERE "invoiceNumber" LIKE 'INV-%' ORDER BY "id" DESC LIMIT 500`,
+  );
 
   const maxSequence = rows.reduce((max, row) => {
     const sequence = parseInvoiceSequence(row.invoiceNumber);

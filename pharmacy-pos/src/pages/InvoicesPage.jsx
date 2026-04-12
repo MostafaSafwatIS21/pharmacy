@@ -10,6 +10,7 @@ import {
   deleteQuotationByInvoiceNumber,
   listQuotationLines,
 } from "../services/quotationDataSource";
+import { useDebounce } from "../hooks/useDebounce";
 import { numberToArabicCurrencyText } from "../utils/arabicCurrency";
 
 const formatCurrency = (value) =>
@@ -30,7 +31,11 @@ function InvoicesPage() {
     new Set(),
   );
   const [invoiceToPrint, setInvoiceToPrint] = useState(null);
+  const [pageSize, setPageSize] = useState(100);
+  const [currentPage, setCurrentPage] = useState(1);
   const printRef = useRef(null);
+  const debouncedQuery = useDebounce(query, 350);
+  const debouncedCustomerFilter = useDebounce(customerFilter, 350);
 
   const handlePrintInvoice = useReactToPrint({
     contentRef: printRef,
@@ -86,22 +91,13 @@ function InvoicesPage() {
   useEffect(() => {
     let active = true;
 
-    Promise.all([
-      listInvoiceLines({
-        search: query,
-        customerName: customerFilter,
-      }),
-      listQuotationLines({ status: "APPROVED" }),
-    ])
-      .then(([invoiceRows, approvedQuotationRows]) => {
+    listInvoiceLines({
+      search: debouncedQuery,
+      customerName: debouncedCustomerFilter,
+    })
+      .then((invoiceRows) => {
         if (active) {
           setInvoices(invoiceRows);
-          const approvedSet = new Set(
-            approvedQuotationRows
-              .map((row) => String(row.approvedInvoiceNumber || "").trim())
-              .filter(Boolean),
-          );
-          setApprovedInvoiceNumbers(approvedSet);
         }
       })
       .catch((error) => {
@@ -113,7 +109,34 @@ function InvoicesPage() {
     return () => {
       active = false;
     };
-  }, [customerFilter, query, reloadKey]);
+  }, [debouncedCustomerFilter, debouncedQuery, reloadKey]);
+
+  useEffect(() => {
+    let active = true;
+
+    listQuotationLines({ status: "APPROVED" })
+      .then((approvedQuotationRows) => {
+        if (!active) {
+          return;
+        }
+
+        const approvedSet = new Set(
+          approvedQuotationRows
+            .map((row) => String(row.approvedInvoiceNumber || "").trim())
+            .filter(Boolean),
+        );
+        setApprovedInvoiceNumbers(approvedSet);
+      })
+      .catch(() => {
+        if (active) {
+          setApprovedInvoiceNumbers(new Set());
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [reloadKey]);
 
   const customerOptions = useMemo(() => {
     const unique = new Set(invoices.map((invoice) => invoice.customerName));
@@ -162,6 +185,18 @@ function InvoicesPage() {
     [groupedInvoices],
   );
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedCustomerFilter, debouncedQuery, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(groupedInvoices.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+
+  const pagedInvoices = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return groupedInvoices.slice(start, start + pageSize);
+  }, [groupedInvoices, pageSize, safePage]);
+
   return (
     <section className="space-y-6">
       <div>
@@ -173,7 +208,7 @@ function InvoicesPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-[1fr_220px_auto]">
+      <div className="grid gap-3 sm:grid-cols-[1fr_220px_auto_auto]">
         <label className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2">
           <Search size={16} className="text-slate-500" />
           <input
@@ -203,6 +238,16 @@ function InvoicesPage() {
         >
           تحديث
         </button>
+
+        <select
+          value={pageSize}
+          onChange={(event) => setPageSize(Number(event.target.value))}
+          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none"
+        >
+          <option value={50}>50 / صفحة</option>
+          <option value={100}>100 / صفحة</option>
+          <option value={250}>250 / صفحة</option>
+        </select>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -220,7 +265,7 @@ function InvoicesPage() {
               </tr>
             </thead>
             <tbody>
-              {groupedInvoices.map((invoice) => {
+              {pagedInvoices.map((invoice) => {
                 const expanded = expandedInvoiceId === invoice.groupId;
                 const isDeleting = deletingInvoiceId === invoice.groupId;
 
@@ -342,9 +387,29 @@ function InvoicesPage() {
       </div>
 
       <p className="text-sm text-slate-700">
-        الفواتير: {groupedInvoices.length} | إجمالي القيمة:{" "}
-        {formatCurrency(totalAmount)}
+        الفواتير: {groupedInvoices.length} | الصفحة {safePage} / {totalPages} |
+        إجمالي القيمة: {formatCurrency(totalAmount)}
       </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+          disabled={safePage === 1}
+          className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          السابق
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+          }
+          disabled={safePage === totalPages}
+          className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          التالي
+        </button>
+      </div>
       {message && (
         <p className="text-sm font-medium text-slate-800">{message}</p>
       )}

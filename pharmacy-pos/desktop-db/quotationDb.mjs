@@ -22,7 +22,7 @@ const formatQuoteNumber = (sequence) =>
 
 export const getNextQuoteNumber = async () => {
   const rows = await prisma.$queryRawUnsafe(
-    `SELECT "quoteNumber" FROM "Quotation"`,
+    `SELECT "quoteNumber" FROM "Quotation" WHERE "quoteNumber" LIKE 'QTN-%' ORDER BY "id" DESC LIMIT 500`,
   );
 
   const maxSequence = rows.reduce((max, row) => {

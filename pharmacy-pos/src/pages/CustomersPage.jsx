@@ -1,11 +1,12 @@
 import { Pencil, Search, Trash2, UserPlus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   addCustomer,
   deleteCustomer,
   listCustomers,
   updateCustomer,
 } from "../services/customerDataSource";
+import { useDebounce } from "../hooks/useDebounce";
 
 const EMPTY_FORM = {
   name: "",
@@ -20,6 +21,7 @@ function CustomersPage() {
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const debouncedQuery = useDebounce(query, 350);
 
   const loadCustomers = async (search = "") => {
     const result = await listCustomers({ search });
@@ -27,22 +29,10 @@ function CustomersPage() {
   };
 
   useEffect(() => {
-    loadCustomers().catch(() => setMessage("تعذر تحميل العملاء."));
-  }, []);
-
-  const visibleCustomers = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) {
-      return customers;
-    }
-
-    return customers.filter((customer) =>
-      [customer.name, customer.location, customer.phoneNumber]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalized),
+    loadCustomers(debouncedQuery).catch(() =>
+      setMessage("تعذر تحميل العملاء."),
     );
-  }, [customers, query]);
+  }, [debouncedQuery]);
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
@@ -186,7 +176,7 @@ function CustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {visibleCustomers.map((customer) => (
+              {customers.map((customer) => (
                 <tr key={customer.id} className="border-t border-slate-100">
                   <td className="px-4 py-3 font-semibold text-slate-900">
                     {customer.name}
@@ -224,9 +214,7 @@ function CustomersPage() {
         </div>
       </div>
 
-      <p className="text-sm text-slate-700">
-        عدد العملاء: {visibleCustomers.length}
-      </p>
+      <p className="text-sm text-slate-700">عدد العملاء: {customers.length}</p>
       {message && (
         <p className="text-sm font-medium text-slate-800">{message}</p>
       )}

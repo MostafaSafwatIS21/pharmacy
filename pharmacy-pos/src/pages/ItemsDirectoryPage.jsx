@@ -49,31 +49,35 @@ function ItemsDirectoryPage() {
     return ["all", ...Array.from(unique)];
   }, [items]);
 
+  const indexedItems = useMemo(
+    () =>
+      items.map((item) => ({
+        item,
+        searchBlob: [
+          item.name,
+          item.type,
+          item.details,
+          item.fields?.[mapping.nameHeader],
+          item.fields?.[mapping.priceHeader],
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase(),
+      })),
+    [items, mapping.nameHeader, mapping.priceHeader],
+  );
+
   const filteredItems = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
 
-    return items.filter((item) => {
-      const matchesType = typeFilter === "all" || item.type === typeFilter;
-      const searchableText = [
-        item.name,
-        item.type,
-        item.details,
-        item.fields?.[mapping.nameHeader],
-        item.fields?.[mapping.priceHeader],
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      const matchesQuery = searchableText.includes(normalizedQuery);
-      return matchesType && matchesQuery;
-    });
-  }, [
-    deferredQuery,
-    items,
-    mapping.nameHeader,
-    mapping.priceHeader,
-    typeFilter,
-  ]);
+    return indexedItems
+      .filter(({ item, searchBlob }) => {
+        const matchesType = typeFilter === "all" || item.type === typeFilter;
+        const matchesQuery = searchBlob.includes(normalizedQuery);
+        return matchesType && matchesQuery;
+      })
+      .map(({ item }) => item);
+  }, [deferredQuery, indexedItems, typeFilter]);
 
   useEffect(() => {
     setCurrentPage(1);

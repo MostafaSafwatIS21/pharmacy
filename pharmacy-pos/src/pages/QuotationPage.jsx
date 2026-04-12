@@ -1,5 +1,5 @@
 import { Printer } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
 import { Link } from "react-router-dom";
 import DocumentHeader from "../components/DocumentHeader";
@@ -755,11 +755,8 @@ function QuotationPage() {
                   String(quote.status || "").toUpperCase() === "APPROVED";
                 const isExpanded = expandedQuoteNumber === quote.quoteNumber;
                 return (
-                  <>
-                    <tr
-                      key={quote.quoteNumber}
-                      className="border-t border-slate-200"
-                    >
+                  <Fragment key={quote.quoteNumber}>
+                    <tr className="border-t border-slate-200">
                       <td className="px-3 py-2 font-semibold text-slate-900">
                         {quote.quoteNumber}
                       </td>
@@ -885,7 +882,7 @@ function QuotationPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
               {groupedSavedQuotations.length === 0 && (

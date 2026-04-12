@@ -16,12 +16,10 @@ export const saveImportedCatalog = async ({
   const bridge = getDesktopBridge();
 
   if (bridge?.replaceCatalog && bridge?.getCatalog) {
-    await bridge.replaceCatalog({
+    const storedCatalog = await bridge.replaceCatalog({
       ...parsedResult,
       sourceFileName: fileName,
     });
-
-    const storedCatalog = await bridge.getCatalog();
     setImportedData(storedCatalog);
     return storedCatalog;
   }
@@ -66,8 +64,11 @@ export const saveEditedField = async ({
   const bridge = getDesktopBridge();
 
   if (bridge?.updateCatalogField && bridge?.getCatalog) {
-    await bridge.updateCatalogField({ itemId, header, value });
-    const storedCatalog = await bridge.getCatalog();
+    const storedCatalog = await bridge.updateCatalogField({
+      itemId,
+      header,
+      value,
+    });
     setImportedData(storedCatalog);
     return;
   }
@@ -84,8 +85,7 @@ export const addProduct = async ({
   const bridge = getDesktopBridge();
 
   if (bridge?.addCatalogItem && bridge?.getCatalog) {
-    await bridge.addCatalogItem({ name, price });
-    const storedCatalog = await bridge.getCatalog();
+    const storedCatalog = await bridge.addCatalogItem({ name, price });
     setImportedData(storedCatalog);
     return;
   }
@@ -101,8 +101,7 @@ export const deleteProducts = async ({
   const bridge = getDesktopBridge();
 
   if (bridge?.deleteCatalogItems && bridge?.getCatalog) {
-    await bridge.deleteCatalogItems({ ids: itemIds });
-    const storedCatalog = await bridge.getCatalog();
+    const storedCatalog = await bridge.deleteCatalogItems({ ids: itemIds });
     setImportedData(storedCatalog);
     return;
   }

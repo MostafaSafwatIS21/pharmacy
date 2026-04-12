@@ -88,12 +88,43 @@ export const ensureDesktopSchema = async () => {
     )
   `);
 
-  try {
-    await prisma.$executeRawUnsafe(`
-      ALTER TABLE "Invoice"
-      ADD COLUMN "invoiceNumber" TEXT NOT NULL DEFAULT ''
-    `);
-  } catch {
-    // Column already exists in databases that were already upgraded.
-  }
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "idx_product_name" ON "Product"("name")`,
+  );
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "idx_product_createdAt" ON "Product"("createdAt")`,
+  );
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "idx_customer_name" ON "Customer"("name")`,
+  );
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "idx_customer_phoneNumber" ON "Customer"("phoneNumber")`,
+  );
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "idx_customer_createdAt" ON "Customer"("createdAt")`,
+  );
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "idx_invoice_invoiceNumber" ON "Invoice"("invoiceNumber")`,
+  );
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "idx_invoice_productName" ON "Invoice"("productName")`,
+  );
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "idx_invoice_customerName" ON "Invoice"("customerName")`,
+  );
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "idx_invoice_createdAt" ON "Invoice"("createdAt")`,
+  );
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "idx_quotation_quoteNumber" ON "Quotation"("quoteNumber")`,
+  );
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "idx_quotation_approvedInvoiceNumber" ON "Quotation"("approvedInvoiceNumber")`,
+  );
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "idx_quotation_status" ON "Quotation"("status")`,
+  );
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS "idx_quotation_createdAt" ON "Quotation"("createdAt")`,
+  );
 };
